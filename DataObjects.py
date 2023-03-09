@@ -669,6 +669,8 @@ class EpiSetup:
             if isinstance(v, list):
                 if v[0] == "rnd_inverse" or v[0] == "rnd":
                     setattr(self, k, ParamDistribution(*v))
+                elif v[0] == "inverse":
+                    setattr(self, k, 1 / np.array(v[1]))
                 else:
                     setattr(self, k, np.array(v))
             else:
@@ -689,6 +691,7 @@ class EpiSetup:
             # if the attribute is random variable, generate a deterministic version
             if isinstance(v, ParamDistribution):
                 tempRecord[v.param_name] = v.sample(rng)
+
             elif isinstance(v, np.ndarray):
                 listDistrn = True
                 # if it is a list of random variable, generate a list of deterministic values
@@ -949,7 +952,7 @@ class VariantPool:
                 # returning a percent increase in the parameter value, directly calculate the new sigma_E.
                 new_epi_params_coef[key] = sum(1 / (1 / sigma_E - val[v]) * self.variants_prev[v][t] for v in val) + (
                             1 - var_prev) * sigma_E
-            if key == "immune_evasion":
+            elif key == "immune_evasion":
                 pass
             else:
                 # For other parameters calculate the change in the value as a coefficent:
@@ -996,13 +999,13 @@ class VariantPool:
 
 class ParamDistribution:
     """
-    A class to encapsulate epi paramters that are random
+    A class to encapsulate epi parameters that are random
     Attrs:
         is_inverse (bool): if True, the parameter is used in the model as 1 / x.
         param_name (str): Name of the parameter, used in EpiParams as attribute name.
         distribution_name (str): Name of the distribution, matching functions in np.random.
         det_val (float): Value of the parameter for deterministic simulations.
-        params (list): paramters if the distribution
+        params (list): parameters if the distribution
     """
 
     def __init__(self, inv_opt, param_name, distribution_name, det_val, params):

@@ -15,105 +15,86 @@
         },
         "alpha_gamma_ICU": {
             "delta": 0.8385,
-            "omicron": 3.5,
-            "new_variant": 1
+            "omicron": 3.5
         },
         "alpha_IH": {
             "delta": 1.3,
-            "omicron": 0.999,
-            "new_variant": 0.2
+            "omicron": 0.999
         },
         "alpha_mu_ICU": {
             "delta": 4,
-            "omicron": 2,
-            "new_variant": 2
+            "omicron": 2
         },
         "alpha_IYD": {
             "delta": 0.611,
-            "omicron": 0.17198,
-            "new_variant": 0.002
+            "omicron": 0.17198
         },
         "beta": {
             "delta": 1.65,
-            "omicron": 2.5575,
-            "new_variant": 2.10375
+            "omicron": 2.5575
         },
         "sigma_E": {
             "delta": 1.5,
-            "omicron": 1.5,
-            "new_variant": 0
+            "omicron": 1.5
         },
         "gamma_ICU0": {
             "delta": 0.55,
-            "omicron": 1.2,
-            "new_variant": 1
+            "omicron": 1.2
         },
         "mu_ICU0": {
             "delta": 1,
-            "omicron": 1,
-            "new_variant": 1
+            "omicron": 1
         },
         "YHR": {
             "delta": 1.8,
-            "omicron": 1.25,
-            "new_variant": 1.8
+            "omicron": 1.25
         },
         "YHR_overall": {
             "delta": 1.8,
-            "omicron": 1.25,
-            "new_variant": 1.8
+            "omicron": 1.25
         }
     },
     "vax_params": {
         "v_beta_reduct": {
             "first_dose": {
                 "delta": 0.7,
-                "omicron": 0.65,
-                "new_variant": 0.7
+                "omicron": 0.65
             },
             "second_dose": {
                 "delta": 0.75,
-                "omicron": 0.70,
-                "new_variant": 0.75
+                "omicron": 0.70
             },
             "waned": {
                 "delta": 0.65,
-                "omicron": 0.15,
-                "new_variant": 0.7
+                "omicron": 0.15
             }
         },
         "v_tau_reduct": {
             "first_dose": {
                 "delta": 0.85,
-                "omicron": 0.70,
-                "new_variant": 0.85
+                "omicron": 0.70
             },
             "second_dose": {
                 "delta": 0.95,
-                "omicron": 0.75,
-                "new_variant": 0.95
+                "omicron": 0.75
             },
             "waned": {
                 "delta": 0.75,
-                "omicron": 0.30,
-                "new_variant": 0.7
+                "omicron": 0.30
             }
         },
       "v_pi_reduct": {
             "first_dose": {
                 "delta": 0.95,
-                "omicron": 0.85,
-                "new_variant": 0.85
+                "omicron": 0.85
             },
             "second_dose": {
                 "delta": 0.95,
-                "omicron": 0.90,
-                "new_variant": 0.95
+                "omicron": 0.90
             },
             "waned": {
                 "delta": 0.95,
-                "omicron": 0.70,
-                "new_variant": 0.7
+                "omicron": 0.70
             }
         }
     }

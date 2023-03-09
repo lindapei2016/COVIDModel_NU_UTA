@@ -11,6 +11,7 @@
 # These outputs will be changing a lot for everyone. Better to keep them on local.
 /input_output_folder/*
 /plots/*
+/reports/*
 
 # Latex output
 *.aux
@@ -18,3 +19,5 @@
 *./temp/*.pdf
 *.zip
 *.zip
+*.gz
+*.synctex
