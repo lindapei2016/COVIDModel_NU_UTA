@@ -3,7 +3,7 @@
   "start_date": "2020-02-28 00:00:00",
   "end_date": "2022-09-30 00:00:00",
   "hosp_beds": 1100,
-  "icu": 150,
+  "icu": 200,
   "population": [
     [
       128527,
@@ -105,233 +105,41 @@
         5
       ]
     ],
-    "_gamma_IH": [
-      [
-        "rnd_inverse",
-        "gamma_IH",
-        "choice",
+    "gamma_IH": [
+        "inverse",
+        [4.1683893,
         4.1683893,
-        [
-          [
-            4.1683893
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_IH",
-        "choice",
         4.1683893,
-        [
-          [
-            4.1683893
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_IH",
-        "choice",
-        4.1683893,
-        [
-          [
-            4.1683893
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_IH",
-        "choice",
         4.5005522,
-        [
-          [
-            4.5005522
-          ]
+        4.7088861
         ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_IH",
-        "choice",
-        4.7088861,
-        [
-          [
-            4.7088861
-          ]
-        ]
-      ]
     ],
-    "_etaICU": [
-      [
-        "rnd_inverse",
-        "etaICU",
-        "choice",
+    "etaICU": [
+        "inverse",
+        [3.863028,
         3.863028,
-        [
-          [
-            3.863028
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "etaICU",
-        "choice",
         3.863028,
-        [
-          [
-            3.863028
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "etaICU",
-        "choice",
-        3.863028,
-        [
-          [
-            3.863028
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "etaICU",
-        "choice",
         3.622075,
-        [
-          [
-            3.622075
-          ]
+        3.507737
         ]
-      ],
-      [
-        "rnd_inverse",
-        "etaICU",
-        "choice",
-        3.507737,
-        [
-          [
-            3.507737
-          ]
-        ]
-      ]
     ],
-    "_gamma_ICU": [
-      [
-        "rnd_inverse",
-        "gamma_ICU",
-        "choice",
+    "gamma_ICU": [
+        "inverse",
+        [14.287385,
         14.287385,
-        [
-          [
-            14.287385
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_ICU",
-        "choice",
         14.287385,
-        [
-          [
-            14.287385
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_ICU",
-        "choice",
-        14.287385,
-        [
-          [
-            14.287385
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_ICU",
-        "choice",
         17.406078,
-        [
-          [
-            17.406078
-          ]
+        19.31218
         ]
-      ],
-      [
-        "rnd_inverse",
-        "gamma_ICU",
-        "choice",
-        19.31218,
-        [
-          [
-            19.31218
-          ]
-        ]
-      ]
     ],
-    "_mu_ICU": [
-      [
-        "rnd_inverse",
-        "mu_ICU",
-        "choice",
+    "mu_ICU": [
+        "inverse",
+        [13.352526,
         13.352526,
-        [
-          [
-            13.352526
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "mu_ICU",
-        "choice",
         13.352526,
-        [
-          [
-            13.352526
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "mu_ICU",
-        "choice",
-        13.352526,
-        [
-          [
-            13.352526
-          ]
-        ]
-      ],
-      [
-        "rnd_inverse",
-        "mu_ICU",
-        "choice",
         13.051987,
-        [
-          [
-            13.051987
-          ]
+        12.512027
         ]
-      ],
-      [
-        "rnd_inverse",
-        "mu_ICU",
-        "choice",
-        12.512027,
-        [
-          [
-            12.512027
-          ]
-        ]
-      ]
     ],
     "HICUR": 0.082521564,
     "ICUFR": [
