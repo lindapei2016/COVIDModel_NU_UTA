@@ -889,6 +889,7 @@ class EpiSetup:
 
         # Apply school closure and social distance
         # Assumes 95% reduction on last age group and high risk cocooning
+
         if day_type == 1:  # Weekday
             phi_age_risk = (1 - social_distance) * (
                     phi_all_extended - school * phi_school_extended

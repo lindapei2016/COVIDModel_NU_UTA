@@ -279,11 +279,8 @@ class SimReplication:
             time_start and self.next_t, the last point at which it
             left off.
 
-        :param fixed_kappa_end_date: the end date for fixed transmission reduction (kappa). The staged-alert
-        policy will be called after this date. This is generally the end date of historical data, too.
-        Make sure the transmission.csv file has reduction values until and including fixed_kappa_end_date.
-            If fixed_kappa_end_date is None, the staged-alert policy will be called form the start of the
-            simulation date.
+        Note that if a simulation replication is being run at timepoints
+        t > fixed_kappa_end_date, there must be a MultiTierPolicy attached.
 
         :param time_end: [int] nonnegative integer -- time t (number of days)
             to simulate up to.
@@ -293,17 +290,15 @@ class SimReplication:
             Make sure the transmission.csv file has reduction values until and
             including fixed_kappa_end_date. If fixed_kappa_end_date is 0,
             the staged-alert policy will be called from the start of the
-            simulation date.
+            simulation date. If fixed_kappa_end_date is 0,
+            then staged-alert policy dictates fixed transmission reduction
+            (kappa), even if historical transmission reduction data
+            is available.
         :return: [None]
         """
 
         # Begin where the simulation last left off
         time_start = self.next_t
-
-        # If fixed_kappa_end_date is 0,
-        #   then staged-alert policy dictates fixed transmission reduction
-        #   (kappa),  even if historical transmission reduction data
-        #   is available.
 
         # Call simulate_t as subroutine from time_start to time_end
         for t in range(time_start, time_end):

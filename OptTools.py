@@ -30,6 +30,8 @@ import copy
 import itertools
 import json
 
+from pathlib import Path
+base_path = Path(__file__).parent
 
 ###############################################################################
 
@@ -40,6 +42,10 @@ import json
 #     p = multiprocessing.Process(target=get_sample_paths, args=(i,))
 #     p.start()
 
+# get_sample_paths can be used to generate sample paths for retrospective analysis.
+# Save the state of the rep for each time block as separate files.
+# Each file is used for retrospective analysis of different peaks.
+# Each peak has different end dates of historical data.
 
 def get_sample_paths(
         city,
@@ -47,7 +53,10 @@ def get_sample_paths(
         rsq_cutoff,
         goal_num_good_reps,
         processor_rank=0,
-        timepoints=(25, 100, 200, 400, 783),
+        storage_folder_name="",
+        save_intermediate_states=False,
+        fixed_kappa_end_date=0,
+        timepoints=(25, 100, 200, 400, 763),
         seed_assignment_func=(lambda rank: rank),
 ):
     """
@@ -65,7 +74,7 @@ def get_sample_paths(
         number of policies starting from the last timepoint of a
         pre-generated sample path, rather than starting from
         scratch at a timepoint t=0.
-    Note that in the current version of the code, t=783
+    Note that in the current version of the code, t=763
         is the end of the historical time period (and policies
         go in effect after this point).
 
@@ -85,6 +94,18 @@ def get_sample_paths(
         to generate
     :param processor_rank: [int] non-negative integer
         identifying the parallel processor
+    :param storage_folder_name: [str] string corresponding
+        to folder in which to save .json files. If empty string,
+        files are saved in current working directory.
+    :param save_intermediate_states: [Boolean] indicates
+        whether or not to save states of sample paths with
+        acceptable R-squared at intermediate times in
+        timepoints argument, not just final time
+    :param fixed_kappa_end_date: [int] non-negative integer
+       indicating last day to use fixed transmission reduction.
+       See same param passed to simulate_time_period
+       method of SimReplication object. Make sure transmission.csv
+       file has values up and including the last date in timepoints.
     :param seed_assignment_func: [func] optional function
         mapping processor_rank to the random number seed
         that instantiates the random number generator
@@ -114,11 +135,6 @@ def get_sample_paths(
     num_elim_per_stage = np.zeros(len(timepoints))
     all_rsq = []
 
-    # Take the last date on the timepoints as the last date of fixed transmission
-    # reduction. Make sure transmission.csv file has values up and including the last date
-    # in timepoints.
-    fixed_kappa_end_date = timepoints[-1]
-
     while num_good_reps < goal_num_good_reps:
         total_reps += 1
         valid = True
@@ -127,6 +143,7 @@ def get_sample_paths(
         #   and checking R-squared to eliminate bad
         #   sample paths early on
         rep_list = []
+
         for i in range(len(timepoints)):
             rep.simulate_time_period(timepoints[i], fixed_kappa_end_date)
             rsq = rep.compute_rsq()
@@ -147,21 +164,37 @@ def get_sample_paths(
             num_good_reps += 1
             all_rsq.append(rsq)
             identifier = str(processor_rank) + "_" + str(num_good_reps)
-            # save the state of the rep for each time block as seperate files.
-            # Each file will be used for retrospective analysis of different peaks.
-            # Each peak will have different end dates of historical data.
+
+            # Starting from last time in timepoints, save states
+            #   of acceptable sample paths
+            # If save_intermediate_states is False, then
+            #   only the state at the last time in timepoints is saved
             for i in range(len(timepoints)):
-                t = str(city.cal.calendar[timepoints[i]].date())
-                export_rep_to_json(
-                    rep_list[i],
-                    city.path_to_input_output / (identifier + "_" + t + "_sim.json"),
-                    city.path_to_input_output / (identifier + "_" + t + "_v0.json"),
-                    city.path_to_input_output / (identifier + "_" + t + "_v1.json"),
-                    city.path_to_input_output / (identifier + "_" + t + "_v2.json"),
-                    city.path_to_input_output / (identifier + "_" + t + "_v3.json"),
-                    None,
-                    city.path_to_input_output / (identifier + "_epi_params.json"),
-                )
+                t = str(city.cal.calendar[timepoints[-i]].date())
+                if storage_folder_name == "":
+                    export_rep_to_json(
+                        rep_list[-i],
+                        identifier + "_" + t + "_sim.json",
+                        identifier + "_" + t + "_v0.json",
+                        identifier + "_" + t + "_v1.json",
+                        identifier + "_" + t + "_v2.json",
+                        identifier + "_" + t + "_v3.json",
+                        None,
+                        identifier + "_epi_params.json",
+                    )
+                else:
+                    export_rep_to_json(
+                        rep_list[i],
+                        base_path / storage_folder_name / (identifier + "_" + t + "_sim.json"),
+                        base_path / storage_folder_name / (identifier + "_" + t + "_v0.json"),
+                        base_path / storage_folder_name / (identifier + "_" + t + "_v1.json"),
+                        base_path / storage_folder_name / (identifier + "_" + t + "_v2.json"),
+                        base_path / storage_folder_name / (identifier + "_" + t + "_v3.json"),
+                        None,
+                        base_path / storage_folder_name / (identifier + "_epi_params.json"),
+                    )
+                if save_intermediate_states == False:
+                    break
 
         # Internally save the state of the random number generator
         #   to hand to the next sample path
