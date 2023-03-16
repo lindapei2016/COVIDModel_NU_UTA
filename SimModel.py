@@ -109,7 +109,7 @@ class SimReplication:
         :return: [None]
         """
 
-        if self.rng_seed:
+        if self.rng_seed is not None:
             if self.rng_seed >= 0:
                 self.rng = np.random.default_rng(self.rng_seed)
             else:
@@ -306,6 +306,7 @@ class SimReplication:
             self.next_t += 1
 
             self.simulate_t(t, fixed_kappa_end_date)
+            # print(t)
 
             A = self.instance.A
             L = self.instance.L
