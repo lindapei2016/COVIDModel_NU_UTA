@@ -31,7 +31,9 @@ import itertools
 import json
 
 from pathlib import Path
+
 base_path = Path(__file__).parent
+
 
 ###############################################################################
 
@@ -137,13 +139,15 @@ def get_sample_paths(
 
     while num_good_reps < goal_num_good_reps:
         total_reps += 1
+        # print(num_good_reps)
         valid = True
+
+        if save_intermediate_states:
+            rep_list = []
 
         # Use time block heuristic, simulating in increments
         #   and checking R-squared to eliminate bad
         #   sample paths early on
-        rep_list = []
-
         for i in range(len(timepoints)):
             rep.simulate_time_period(timepoints[i], fixed_kappa_end_date)
             rsq = rep.compute_rsq()
@@ -153,9 +157,10 @@ def get_sample_paths(
                 all_rsq.append(rsq)
                 break
             else:
-                # Cache the state of the simulation rep at the time block.
-                temp_rep = copy.deepcopy(rep)
-                rep_list.append(temp_rep)
+                if save_intermediate_states:
+                    # Cache the state of the simulation rep at the time block.
+                    temp_rep = copy.deepcopy(rep)
+                    rep_list.append(temp_rep)
 
         # If the sample path's R-squared is above rsq_cutoff
         #   at all timepoints, we accept it
@@ -170,31 +175,50 @@ def get_sample_paths(
             # If save_intermediate_states is False, then
             #   only the state at the last time in timepoints is saved
             for i in range(len(timepoints)):
-                t = str(city.cal.calendar[timepoints[-i]].date())
-                if storage_folder_name == "":
-                    export_rep_to_json(
-                        rep_list[-i],
-                        identifier + "_" + t + "_sim.json",
-                        identifier + "_" + t + "_v0.json",
-                        identifier + "_" + t + "_v1.json",
-                        identifier + "_" + t + "_v2.json",
-                        identifier + "_" + t + "_v3.json",
-                        None,
-                        identifier + "_epi_params.json",
-                    )
-                else:
-                    export_rep_to_json(
-                        rep_list[i],
-                        base_path / storage_folder_name / (identifier + "_" + t + "_sim.json"),
-                        base_path / storage_folder_name / (identifier + "_" + t + "_v0.json"),
-                        base_path / storage_folder_name / (identifier + "_" + t + "_v1.json"),
-                        base_path / storage_folder_name / (identifier + "_" + t + "_v2.json"),
-                        base_path / storage_folder_name / (identifier + "_" + t + "_v3.json"),
-                        None,
-                        base_path / storage_folder_name / (identifier + "_epi_params.json"),
-                    )
-                if save_intermediate_states == False:
+                if not save_intermediate_states:
+                    if storage_folder_name == "":
+                        export_rep_to_json(rep,
+                                           identifier + "_sim.json",
+                                           identifier + "_v0.json",
+                                           identifier + "_v1.json",
+                                           identifier + "_v2.json",
+                                           identifier + "_v3.json",
+                                           None,
+                                           identifier + "_epi_params.json")
+                    else:
+                        export_rep_to_json(rep,
+                                           base_path / storage_folder_name / (identifier + "_sim.json"),
+                                           base_path / storage_folder_name / (identifier + "_v0.json"),
+                                           base_path / storage_folder_name / (identifier + "_v1.json"),
+                                           base_path / storage_folder_name / (identifier + "_v2.json"),
+                                           base_path / storage_folder_name / (identifier + "_v3.json"),
+                                           None,
+                                           base_path / storage_folder_name / (identifier + "_epi_params.json"))
                     break
+                else:
+                    t = str(city.cal.calendar[timepoints[i]].date())
+                    if storage_folder_name == "":
+                        export_rep_to_json(
+                            rep_list[i],
+                            identifier + "_" + t + "_sim.json",
+                            identifier + "_" + t + "_v0.json",
+                            identifier + "_" + t + "_v1.json",
+                            identifier + "_" + t + "_v2.json",
+                            identifier + "_" + t + "_v3.json",
+                            None,
+                            identifier + "_epi_params.json",
+                        )
+                    else:
+                        export_rep_to_json(
+                            rep_list[i],
+                            base_path / storage_folder_name / (identifier + "_" + t + "_sim.json"),
+                            base_path / storage_folder_name / (identifier + "_" + t + "_v0.json"),
+                            base_path / storage_folder_name / (identifier + "_" + t + "_v1.json"),
+                            base_path / storage_folder_name / (identifier + "_" + t + "_v2.json"),
+                            base_path / storage_folder_name / (identifier + "_" + t + "_v3.json"),
+                            None,
+                            base_path / storage_folder_name / (identifier + "_epi_params.json"),
+                        )
 
         # Internally save the state of the random number generator
         #   to hand to the next sample path
@@ -222,8 +246,8 @@ def get_sample_paths(
                 str(processor_rank) + "_all_rsq.csv", np.array(all_rsq), delimiter=","
             )
 
-###############################################################################
 
+###############################################################################
 
 def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     """
@@ -267,7 +291,6 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
 
 ###############################################################################
 
-
 def evaluate_policies_on_sample_paths(
         city,
         tiers,
@@ -276,9 +299,10 @@ def evaluate_policies_on_sample_paths(
         end_time,
         RNG,
         num_reps,
-        base_filename,
         processor_rank,
         processor_count_total,
+        base_filename,
+        storage_folder_name=""
 ):
     """
     Creates a MultiTierPolicy object for each threshold in
@@ -330,10 +354,13 @@ def evaluate_policies_on_sample_paths(
     :param RNG: [obj] instance of np.random.default_rng(),
         a random number generator
     :param num_reps: [int] number of sample paths to test policies on
-    :param base_filename: [str] prefix common to all filenames
     :param processor_rank: [int] nonnegative unique identifier of
         the parallel processor
     :param processor_count_total: [int] total number of processors
+    :param base_filename: [str] prefix common to all filenames
+    :param storage_folder_name: [str] string corresponding
+        to folder in which to save .json files. If empty string,
+        files are saved in current working directory.
     :return: [None]
     """
 
@@ -346,30 +373,24 @@ def evaluate_policies_on_sample_paths(
     )
 
     # Assign each processor its own set of MultiTierPolicy objects to simulate
-    # Some processors have min_num_policies_per_processor
-    # Others have min_num_policies_per_processor + 1
+    # Some processors have base_assignment
+    # Others have base_assignment + 1
     num_policies = len(policies_array)
-    min_num_policies_per_processor = int(np.floor(num_policies / processor_count_total))
-    leftover_num_policies = num_policies % processor_count_total
+    base_assignment = int(np.floor(num_policies / processor_count_total))
+    leftover = num_policies % processor_count_total
 
-    if processor_rank in np.arange(leftover_num_policies):
-        start_point = processor_rank * (min_num_policies_per_processor + 1)
-        policies_ix_processor = np.arange(
-            start_point, start_point + (min_num_policies_per_processor + 1)
-        )
-    else:
-        start_point = (min_num_policies_per_processor + 1) * leftover_num_policies + (
-                processor_rank - leftover_num_policies
-        ) * min_num_policies_per_processor
-        policies_ix_processor = np.arange(
-            start_point, start_point + min_num_policies_per_processor
-        )
+    slicepoints = np.append([0],
+                            np.cumsum(np.append(np.full(leftover, base_assignment + 1),
+                                                np.full(processor_count_total - leftover, base_assignment))))
+
+    if storage_folder_name != "":
+        base_filename = base_path / storage_folder_name / base_filename
 
     # Iterate through each replication
     for rep in range(num_reps):
 
         # Load the sample path from .json files for each replication
-        base_json_filename = base_filename + str(rep + 1) + "_"
+        base_json_filename = str(base_filename) + str(rep + 1) + "_"
         base_rep = SimReplication(city, vaccines, None, 1)
         import_rep_from_json(
             base_rep,
@@ -389,7 +410,7 @@ def evaluate_policies_on_sample_paths(
         feasibility_data = []
 
         # Iterate through each policy
-        for policy in policies_array[policies_ix_processor]:
+        for policy in policies_array[slicepoints[processor_rank]:slicepoints[processor_rank + 1]]:
             base_rep.policy = policy
             base_rep.simulate_time_period(end_time)
 
@@ -432,11 +453,13 @@ def evaluate_single_policy_on_sample_path(city: object,
     do projections or retrospective analysis with a single given staged-alert policy
     and creating data for plotting. This is not used for optimization.
     """
+
     kappa_t_end = city.cal.calendar[fixed_kappa_end_date].date()
     # Iterate through each replication
     for rep in range(num_reps):
         # Load the sample path from .json files for each replication
-        base_json_filename = str(city.path_to_input_output) + "/base_files/" + base_filename + str(rep + 1) + "_" + str(kappa_t_end) + "_"
+        base_json_filename = str(city.path_to_input_output) + "/base_files/" + base_filename + str(rep + 1) + "_" + str(
+            kappa_t_end) + "_"
         base_rep = SimReplication(city, vaccines, None, 1)
         import_rep_from_json(base_rep, base_json_filename + "sim.json",
                              base_json_filename + "v0.json",
@@ -444,7 +467,8 @@ def evaluate_single_policy_on_sample_path(city: object,
                              base_json_filename + "v2.json",
                              base_json_filename + "v3.json",
                              None,
-                             str(city.path_to_input_output) + "/base_files/" + base_filename + str(rep + 1) + "_epi_params.json")
+                             str(city.path_to_input_output) + "/base_files/" + base_filename + str(
+                                 rep + 1) + "_epi_params.json")
         if rep == 0:
             base_rep.rng = np.random.default_rng(seed)
         else:
@@ -472,5 +496,3 @@ def evaluate_single_policy_on_sample_path(city: object,
         # Clear the policy and simulation replication history
         base_rep.policy.reset()
         base_rep.reset()
-
-
