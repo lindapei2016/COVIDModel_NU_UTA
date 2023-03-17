@@ -29,9 +29,9 @@ real_data_file_names = {}
 surge_colors = ['moccasin', 'pink']
 
 
-def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_thresholds, policy_name, tier_colors):
-    sim_outputs, policy_outputs = import_stoch_reps_for_reporting(seeds, num_reps, real_history_end_date, instance, policy_name)
+def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_thresholds, policy_name, tier_colors, storage_folder_name):
 
+    sim_outputs, policy_outputs = import_stoch_reps_for_reporting(seeds, num_reps, real_history_end_date, instance, policy_name, storage_folder_name)
     central_path_id = find_central_path(sim_outputs["ICU_history"],
                                         sim_outputs["IH_history"],
                                         instance.real_IH_history,
@@ -123,9 +123,9 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
 
 
 def report_from_file(seeds, num_reps, instance, history_end_date, stats_end_date, policy_name, tier_colors,
-                     report_template):
+                     report_template, storage_folder_name):
     sim_outputs, policy_outputs = import_stoch_reps_for_reporting(seeds, num_reps, history_end_date, instance,
-                                                                  policy_name)
+                                                                  policy_name, storage_folder_name)
     report = Report(instance, sim_outputs, policy_outputs, history_end_date, stats_end_date, tier_colors,
                     report_template)
     report.build_report()

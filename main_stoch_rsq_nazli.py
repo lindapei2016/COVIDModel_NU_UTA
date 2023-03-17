@@ -38,6 +38,7 @@ history_end_time = dt.datetime(2021, 11, 30)
 simulation_end_time = dt.datetime(2022, 3, 31)
 seeds = np.arange(100, 160, 2)
 new_seeds = np.arange(200, 260, 2)
+
 num_reps = 10
 time_points = [dt.datetime(2020, 5, 30),
                dt.datetime(2020, 11, 30),
@@ -59,7 +60,10 @@ mtp = MultiTierPolicy(austin, tiers, thresholds, None)
 
 if __name__ == '__main__':
     # for i in seeds:
-    #     p = mp.Process(target=get_sample_paths, args=(austin, vaccines, 0.75, num_reps, i, time_points))
+    #     p = mp.Process(target=get_sample_paths, args=(austin, vaccines, 0.75, num_reps, i,
+    #                                                   "input_output_folder/austin/base_files",
+    #                                                   True, time_points[-1], time_points)
+    #                    )
     #     p.start()
     # for i in range(len(seeds)):
     #     p.join()
@@ -84,8 +88,12 @@ if __name__ == '__main__':
     #                          austin.cal.calendar.index(history_end_time),
     #                          new_seeds[i],
     #                          num_reps,
-    #                          base_filename)
+    #                          base_filename,
+    #                          "input_output_folder/austin/base_files",
+    #                          "input_output_folder/austin")
     #                    )
+    #
+    #
     #     p.start()
     # for i in range(len(seeds)):
     #     p.join()
@@ -97,6 +105,7 @@ if __name__ == '__main__':
     policy_name_ctp = f"CDC_{case_threshold}"
     report_template_ctp = "report_template_CDC.tex"
     report_template_mtp = "report_template.tex"
-    # plot_from_file(seeds, num_reps, austin, history_end_time, equivalent_thresholds, policy_name_ctp, tier_colors_ctp)
-    report_from_file(seeds, num_reps, austin, history_end_time, simulation_end_time, policy_name_ctp, tier_colors_ctp,
-                     report_template_ctp)
+    plot_from_file(seeds, num_reps, austin, history_end_time, equivalent_thresholds, policy_name_mtp, tier_colors_mtp,
+                   "input_output_folder/austin")
+    report_from_file(seeds, num_reps, austin, history_end_time, simulation_end_time, policy_name_mtp, tier_colors_mtp,
+                     report_template_mtp, "input_output_folder/austin")

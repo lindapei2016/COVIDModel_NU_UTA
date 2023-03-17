@@ -446,19 +446,35 @@ def evaluate_single_policy_on_sample_path(city: object,
                                           fixed_kappa_end_date: int,
                                           seed: int,
                                           num_reps: int,
-                                          base_filename: str):
+                                          base_filename: str,
+                                          base_storage_folder_name="",
+                                          storage_folder_name=""
+                                          ):
     """
     Creates a MultiTierPolicy object for a single tier policy. Simulates this
     policy starting from pre-saved sample paths up to end_time. This function is used
     do projections or retrospective analysis with a single given staged-alert policy
     and creating data for plotting. This is not used for optimization.
+
+    :param base_storage_folder_name: [str] string corresponding
+        to folder in which the base .json files are stored. If empty string,
+        files are available in current working directory.
+
+    :param storage_folder_name: [str] string corresponding
+        to folder in which to save .json files. If empty string,
+        files are saved in current working directory.
     """
 
     kappa_t_end = city.cal.calendar[fixed_kappa_end_date].date()
+    if base_storage_folder_name != "":
+        base_path_filename = base_path / base_storage_folder_name / base_filename
+    else:
+        base_path_filename = base_path / base_filename
+
     # Iterate through each replication
     for rep in range(num_reps):
         # Load the sample path from .json files for each replication
-        base_json_filename = str(city.path_to_input_output) + "/base_files/" + base_filename + str(rep + 1) + "_" + str(
+        base_json_filename = str(base_path_filename) + str(rep + 1) + "_" + str(
             kappa_t_end) + "_"
         base_rep = SimReplication(city, vaccines, None, 1)
         import_rep_from_json(base_rep, base_json_filename + "sim.json",
@@ -467,7 +483,7 @@ def evaluate_single_policy_on_sample_path(city: object,
                              base_json_filename + "v2.json",
                              base_json_filename + "v3.json",
                              None,
-                             str(city.path_to_input_output) + "/base_files/" + base_filename + str(
+                             str(base_path_filename) + str(
                                  rep + 1) + "_epi_params.json")
         if rep == 0:
             base_rep.rng = np.random.default_rng(seed)
@@ -480,16 +496,21 @@ def evaluate_single_policy_on_sample_path(city: object,
         #   to hand to the next sample path
         next_rng = base_rep.rng
         # Save results
-        base_json_filename = str(city.path_to_input_output) + "/" + base_filename + str(rep + 1) + "_" + str(
+        if storage_folder_name != "":
+            path_filename = base_path / storage_folder_name / base_filename
+        else:
+            path_filename = base_path / storage_folder_name / base_filename
+
+        json_filename = str(path_filename) + str(rep + 1) + "_" + str(
             kappa_t_end) + "_"
         export_rep_to_json(
             base_rep,
-            base_json_filename + str(policy) + "_sim_updated.json",
-            base_json_filename + str(policy) + "_v0_scratch.json",
-            base_json_filename + str(policy) + "_v1_scratch.json",
-            base_json_filename + str(policy) + "_v2_scratch.json",
-            base_json_filename + str(policy) + "_v3_scratch.json",
-            base_json_filename + str(policy) + "_policy.json"
+            json_filename + str(policy) + "_sim_updated.json",
+            json_filename + str(policy) + "_v0_scratch.json",
+            json_filename + str(policy) + "_v1_scratch.json",
+            json_filename + str(policy) + "_v2_scratch.json",
+            json_filename + str(policy) + "_v3_scratch.json",
+            json_filename + str(policy) + "_policy.json"
         )
 
         # Clear the policy and simulation replication history

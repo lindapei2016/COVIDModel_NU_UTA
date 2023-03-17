@@ -38,6 +38,7 @@ class Plot:
                  real_data: list,
                  sim_data: list,
                  var: str,
+                 policy_name,
                  central_path=0,
                  color=('teal', 'paleturquoise'),
                  text_size=28):
@@ -50,6 +51,7 @@ class Plot:
         else:
             self.sim_data = [np.sum(s, axis=(1, 2)) for s in sim_data]
         self.var = var
+        self.policy_name = policy_name
         self.central_path = central_path
         self.T = len(np.sum(sim_data[0], axis=(1, 2)))
         self.T_real = (real_history_end_date - instance.start_date).days
@@ -258,7 +260,7 @@ class Plot:
         self.save_plot("changing_horizontal")
 
     def save_plot(self, plot_type):
-        plt.savefig(self.path_to_plot / f"{self.var}_{plot_type}.png")
+        plt.savefig(self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.var}_{plot_type}.png")
 
     def vertical_plot(self, tier_history, tier_colors, cap_limit=0):
         """

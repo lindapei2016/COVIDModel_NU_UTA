@@ -111,6 +111,7 @@ class SimCalendar:
             if dt_hd in self.calendar:
                 self._day_type[self.calendar_ix[dt_hd]] = LONG_HOLIDAY
 
+
 class City:
     def __init__(
             self,
@@ -129,8 +130,6 @@ class City:
     ):
         self.city = city
         self.path_to_data = base_path / "instances" / f"{city}"
-        # Extra folder to store the json files for inputting outputting simulation data:
-        self.path_to_input_output = base_path / "input_output_folder" / f"{city}"
 
         with open(str(self.path_to_data / config_filename), "r") as input_file:
             self.config = json.load(input_file)
