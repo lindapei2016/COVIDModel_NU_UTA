@@ -20,7 +20,7 @@
 #   import sys
 #   sys.path.append(<NAME_OF_YOUR_DIRECTORY>)
 
-# Linda Pei 2022
+# Linda Pei 2023
 
 ###############################################################################
 
@@ -271,7 +271,7 @@ print(rep.compute_rsq())
 # Next we demonstrate stopping and starting a simulation rep
 #   across a Python session, including across computers.
 
-# Let's simulate our policy up to time 300.
+# Let's simulate our policy up to time 800.
 rep.policy.reset()
 rep = SimReplication(austin, vaccines, mtp, 1000)
 rep.simulate_time_period(800)
@@ -293,12 +293,13 @@ InputOutputTools.export_rep_to_json(rep, "sim_rep.json",
 # To read-in previously saved simulation states,
 #   we create a new SimReplication instance and apply
 #   import_rep_from_json on it.
-# The files must be in the same directory as the main .py file.
+# These files are currently in the same directory as the main .py file.
 # Note the line about rep.rng -- we will explain this later.
 rep = SimReplication(austin, vaccines, mtp, 1000)
 InputOutputTools.import_rep_from_json(rep, "sim_rep.json",
                                       "v0.json", "v1.json", "v2.json", "v3.json",
                                       "policy.json", "random_params.json")
+# rep.epi_rand.setup_base_params()
 rep.rng = np.random.default_rng(10000)
 
 # Now rep.next_time is 800, where we last left off.
