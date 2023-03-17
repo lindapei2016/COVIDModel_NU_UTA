@@ -419,7 +419,6 @@ def evaluate_single_policy_on_sample_path(city: object,
 
         base_rep.policy = policy
         base_rep.simulate_time_period(end_time)
-        breakpoint()
         # Internally save the state of the random number generator
         #   to hand to the next sample path
         next_rng = base_rep.rng

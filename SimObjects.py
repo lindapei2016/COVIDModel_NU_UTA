@@ -92,7 +92,7 @@ class CDCTierPolicy:
         self.surge_history = None
 
     def __repr__(self):
-        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds}_{self.staffed_bed_thresholds}"
+        return f"CDC_{self.case_threshold}"
 
     def __call__(self, t, ToIHT, IH, ToIY, ICU):
         N = self._instance.N

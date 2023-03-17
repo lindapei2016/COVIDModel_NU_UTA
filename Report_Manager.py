@@ -2,11 +2,10 @@ import os
 from pathlib import Path
 import numpy as np
 from matplotlib import pyplot as plt
-import datetime as dt
+
 base_path = Path(__file__).parent
 
 percentiles = [5, 50, 95, 99, 100]
-tier_colors = ["green", "blue", "yellow", "orange", "red"]
 
 
 class Report:
@@ -20,13 +19,13 @@ class Report:
                  policy_data,
                  history_end_date=None,
                  stats_end_date=None,
-                 central_path=0,
+                 tier_colors=["blue", "yellow", "orange", "red"],
                  template_file="report_template.tex"):
 
         self.instance = instance
         self.sim_data = sim_data
         self.policy_data = policy_data
-        self.central_path = central_path
+        self.tier_colors = tier_colors
         self.path_to_report = base_path / "reports"
         self.template_file = f"{self.path_to_report}/{template_file}"
         self.stats_start_date = history_end_date
@@ -105,17 +104,17 @@ class Report:
         """
         tier_hist_list = []
         lockdown_report = []
-        for u in range(1, len(tier_colors)):
+        for u, tier_color in self.tier_colors.items():
             tier_hist = np.array([np.sum(np.array(hist) == u) for hist in self.policy_data["tier_history"]])
 
             lockdown_report.append({
-                f'MEAN-{tier_colors[u].upper()}': f'{np.mean(tier_hist):.2f}',
-                f'P50-{tier_colors[u].upper()}': f'{np.percentile(tier_hist, q=50)}',
-                f'P5-{tier_colors[u].upper()}': f'{np.percentile(tier_hist, q=5)}',
-                f'P95-{tier_colors[u].upper()}': f'{np.percentile(tier_hist, q=95)}'
+                f'MEAN-{tier_color.upper()}': f'{np.mean(tier_hist):.2f}',
+                f'P50-{tier_color.upper()}': f'{np.percentile(tier_hist, q=50)}',
+                f'P5-{tier_color.upper()}': f'{np.percentile(tier_hist, q=5)}',
+                f'P95-{tier_color.upper()}': f'{np.percentile(tier_hist, q=95)}'
             })
-            self.report_data.update(lockdown_report[u - 1])
-            self.report_data[f'PATHS-IN-{tier_colors[u].upper()}'] = 100 * round(
+            self.report_data.update(lockdown_report[u])
+            self.report_data[f'PATHS-IN-{tier_color.upper()}'] = 100 * round(
                 sum(tier_hist > 0) / len(tier_hist), 4)
             tier_hist_list.append(tier_hist)
 
@@ -177,7 +176,7 @@ class Report:
         """
         tier_hist_mean = [np.mean(tier) / (self.T_end - self.T_start) for tier in tier_hist_list]
         fig, ax = plt.subplots()
-        ax.bar([1, 2, 3, 4], tier_hist_mean, color=tier_colors[1:])
+        ax.bar([i for i in range(len(self.tier_colors))], tier_hist_mean, color=self.tier_colors.values())
         ax.set_ylabel("Proportion of days")
         ax.set_ylim(0, 1)
         plot_filename = self.path_to_report / f"bar_{self.report_data['instance_name']}_{self.trigger_summary()}_{self.stats_start_date.date()}.pdf"

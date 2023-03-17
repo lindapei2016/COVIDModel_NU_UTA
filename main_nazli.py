@@ -23,7 +23,7 @@ austin = City(
     "austin_real_death_from_home.csv",
     "variant_prevalence.csv"
 )
-
+tiers_CDC = TierInfo("austin", "tiers_CDC.json")
 tiers = TierInfo("austin", "tiers5_opt_Final.json")
 vaccines = Vaccine(
     austin,
@@ -34,25 +34,23 @@ vaccines = Vaccine(
 )
 
 ###############################################################################
-thresholds = (-1, 5, 15, 25, 50)
+thresholds = (-1, 0, 15, 25, 50)
 mtp = MultiTierPolicy(austin, tiers, thresholds, "green")
-case_threshold = 200
-hosp_adm_thresholds = {"non_surge": (-1, -1, 10, 20, 20), "surge": (-1, -1, -1, 10, 10)}
-staffed_thresholds = {"non_surge": (-1, -1, 0.1, 0.15, 0.15), "surge": (-1, -1, -1, 0.1, 0.1)}
+history_end_time = dt.datetime(2022, 3, 30)
+simulation_end_time = dt.datetime(2022, 4, 30)
+policy_name_mtp = str(thresholds)
 
-# CDC threshold uses 7-day sum of hospital admission per 100k. The equivalent values if we were to use 7-day avg.
-# hospital admission instead are as follows. We use equivalent thresholds to plot and evaluate the results in our
-# indicator. I used the same CDC thresholds all the time but if we decide to optimize CDC threshold, we can calculate
-# the equivalent values in the model and save to the policy.json.
-equivalent_thresholds = {"non_surge": (-1, -1, 28.57, 57.14, 57.14), "surge": (-1, -1, -1, 28.57, 28.57)}
-ctp = CDCTierPolicy(austin, tiers, case_threshold, hosp_adm_thresholds, staffed_thresholds)
+case_threshold = 200
+hosp_adm_thresholds = {"non_surge": (-1, 10, 20), "surge": (-1, -1, 10)}
+staffed_thresholds = {"non_surge": (-1, 0.1, 0.15), "surge": (-1, -1, 0.1)}
+percentage_cases = 0.4
+ctp = CDCTierPolicy(austin, tiers_CDC, case_threshold, hosp_adm_thresholds, staffed_thresholds, percentage_cases)
+
+policy_name_ctp = f"CDC_{case_threshold}"
 seed = -1
 rep = SimReplication(austin, vaccines, ctp, seed)
-
-time_end = austin.cal.calendar.index(dt.datetime(2022, 5, 30))
-fixed_kappa_end_time = austin.cal.calendar.index(dt.datetime(2022, 3, 30))
-rep.simulate_time_period(time_end, fixed_kappa_end_time)
-base_filename = f"{austin.path_to_input_output}/{seed}_1_{dt.datetime(2022, 3, 30).date()}"
+rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time), austin.cal.calendar.index(history_end_time))
+base_filename = f"{austin.path_to_input_output}/{seed}_1_{history_end_time.date()}_{policy_name_ctp}"
 export_rep_to_json(
     rep,
     f"{base_filename}_sim_updated.json",
@@ -62,5 +60,6 @@ export_rep_to_json(
     f"{base_filename}_v3.json",
     f"{base_filename}_policy.json"
 )
-fixed_kappa_end_time = dt.datetime(2022, 3, 30)
-plot_from_file([seed], 1, austin, fixed_kappa_end_time, equivalent_thresholds)
+tier_colors_ctp = {0: "blue", 1: "gold", 2: "red"}
+equivalent_thresholds = {"non_surge": (-1, 28.57, 57.14), "surge": (-1, -1, 28.57)}
+plot_from_file([seed], 1, austin, history_end_time, equivalent_thresholds, policy_name_ctp, tier_colors_ctp)
