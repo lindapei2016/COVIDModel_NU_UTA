@@ -102,7 +102,7 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
             plot = Plot(instance, real_history_end_date, real_data, val, "ToIY_history_sum", policy_name,
                         central_path_id)
             plot.vertical_plot(policy_outputs["surge_history"], surge_colors, policy_outputs["case_threshold"])
-
+            plot.dali_plot(policy_outputs["surge_history"], surge_colors, policy_outputs["case_threshold"])
         # elif key == "D_history":
         #     real_data = np.cumsum(
         #         np.array([ai + bi for (ai, bi) in zip(instance.real_ToIYD_history, instance.real_ToICUD_history)]))

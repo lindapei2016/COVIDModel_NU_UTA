@@ -8,6 +8,9 @@ from Plotting import plot_from_file
 # Import other Python packages
 import numpy as np
 import datetime as dt
+from pathlib import Path
+
+base_path = Path(__file__).parent
 
 austin = City(
     "austin",
@@ -50,7 +53,9 @@ policy_name_ctp = f"CDC_{case_threshold}"
 seed = -1
 rep = SimReplication(austin, vaccines, ctp, seed)
 rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time), austin.cal.calendar.index(history_end_time))
-base_filename = f"{austin.path_to_input_output}/{seed}_1_{history_end_time.date()}_{policy_name_ctp}"
+
+
+base_filename = f"{base_path}/input_output_folder/austin/{seed}_1_{history_end_time.date()}_{policy_name_ctp}"
 export_rep_to_json(
     rep,
     f"{base_filename}_sim_updated.json",
@@ -62,4 +67,4 @@ export_rep_to_json(
 )
 tier_colors_ctp = {0: "blue", 1: "gold", 2: "red"}
 equivalent_thresholds = {"non_surge": (-1, 28.57, 57.14), "surge": (-1, -1, 28.57)}
-plot_from_file([seed], 1, austin, history_end_time, equivalent_thresholds, policy_name_ctp, tier_colors_ctp)
+plot_from_file([seed], 1, austin, history_end_time, equivalent_thresholds, policy_name_ctp, tier_colors_ctp, "input_output_folder/austin")

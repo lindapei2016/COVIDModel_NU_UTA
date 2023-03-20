@@ -182,7 +182,7 @@ class City:
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Set up base_epi
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        self.base_epi = EpiSetup(data["epi_params"], self.end_date)
+        self.base_epi = EpiSetup(data["epi_params"])
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Load hospitalization-related data
@@ -641,24 +641,9 @@ class EpiSetup:
     Scenarios 6 corresponds to best guess parameters for UT group.
     """
 
-    def __init__(self, params, end_date):
+    def __init__(self, params):
 
         self.load_file(params)
-
-        try:
-            self.qInt["testStart"] = dt.datetime.strptime(
-                self.qInt["testStart"], datetime_formater
-            )
-        except:
-            setattr(
-                self,
-                "qInt",
-                {
-                    "testStart": end_date,
-                    "qRate": {"IY": 0, "IA": 0, "PY": 0, "PA": 0},
-                    "randTest": 0,
-                },
-            )
 
         # Parameters that are randomly sampled for each replication
         self.random_params_dict = {}

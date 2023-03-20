@@ -77,13 +77,13 @@ if __name__ == '__main__':
     #                                           austin.cal.calendar.index(history_end_time),
     #                                           new_seeds[i],
     #                                           num_reps,
-    #                                           base_filename)
+    #                                         base_filename)
     # for i in range(len(seeds)):
     #     base_filename = f"{seeds[i]}_"
     #     p = mp.Process(target=evaluate_single_policy_on_sample_path,
     #                    args=(austin,
     #                          vaccines,
-    #                          mtp,
+    #                          ctp,
     #                          austin.cal.calendar.index(simulation_end_time),
     #                          austin.cal.calendar.index(history_end_time),
     #                          new_seeds[i],
@@ -105,7 +105,7 @@ if __name__ == '__main__':
     policy_name_ctp = f"CDC_{case_threshold}"
     report_template_ctp = "report_template_CDC.tex"
     report_template_mtp = "report_template.tex"
-    plot_from_file(seeds, num_reps, austin, history_end_time, equivalent_thresholds, policy_name_mtp, tier_colors_mtp,
+    plot_from_file(seeds, num_reps, austin, history_end_time, equivalent_thresholds, policy_name_ctp, tier_colors_ctp,
                    "input_output_folder/austin")
-    report_from_file(seeds, num_reps, austin, history_end_time, simulation_end_time, policy_name_mtp, tier_colors_mtp,
-                     report_template_mtp, "input_output_folder/austin")
+    report_from_file(seeds, num_reps, austin, history_end_time, simulation_end_time, policy_name_ctp, tier_colors_ctp,
+                     report_template_ctp, "input_output_folder/austin")

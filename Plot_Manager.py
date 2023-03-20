@@ -154,10 +154,10 @@ class Plot:
         """
         # Axis ticks: write the name of the month on the x-axis:
         self.ax1.xaxis.set_ticks(
-            [t for t, d in enumerate(self.instance.cal.calendar) if (d.day == 1 or d.day == 15)]) # and d.month % 2 == 1
+            [t for t, d in enumerate(self.instance.cal.calendar) if (d.day == 1 and d.month % 2 == 1)]) # and d.month % 2 == 1
         self.ax1.xaxis.set_ticklabels(
             [f' {py_cal.month_abbr[d.month]} ' for t, d in enumerate(self.instance.cal.calendar) if
-             (d.day == 1 or d.day == 15)],  # and d.month % 2 == 1
+             (d.day == 1 and d.month % 2 == 1)],  # and d.month % 2 == 1
             rotation=0,
             fontsize=22)
 
