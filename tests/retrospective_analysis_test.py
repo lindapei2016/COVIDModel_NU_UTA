@@ -61,6 +61,8 @@ class TestFixedCDCPolicy(unittest.TestCase):
 
     def test_sample_path_files(self):
         """
+        Run four sample paths with two seeds without parallelization.
+
         - Test if files are created successfully for each sample path with each time brackets with get_sample_paths()
         functions.
         - Test if files are created successfully after policy evaluation for each time brackets with
