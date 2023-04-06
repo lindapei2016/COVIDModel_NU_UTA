@@ -33,18 +33,15 @@ class SimCalendar:
     def __init__(self, start_date, sim_length,
                  school_closure_blocks,
                  ts_transmission_reduction, ts_cocooning,
-                 holidays, long_holidays,
-                 real_IH_history):
+                 holidays, long_holidays):
         self.start = start_date
         self.calendar = [self.start + dt.timedelta(days=t) for t in range(sim_length)]
         self.calendar_ix = {d: d_ix for (d_ix, d) in enumerate(self.calendar)}
         self._is_weekday = [d.weekday() not in [5, 6] for d in self.calendar]
         self._day_type = [WEEKDAY if iw else WEEKEND for iw in self._is_weekday]
-        self.lockdown = None
         self.schools_closed = None
         self.fixed_transmission_reduction = None
         self.fixed_cocooning = None
-        self.real_hosp = real_IH_history
 
         self.load_school_closure(school_closure_blocks)
         self.load_fixed_transmission_reduction(ts_transmission_reduction)
@@ -131,62 +128,11 @@ class City:
         self.city = city
         self.path_to_data = base_path / "instances" / f"{city}"
 
-        with open(str(self.path_to_data / config_filename), "r") as input_file:
-            self.config = json.load(input_file)
+        self.config = {}
+        self.load_config(config_filename)
 
-        self.epi_rand = None
+        self.load_setup_data(setup_filename)
 
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        #  Load data from setup_filename
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        with open(str(self.path_to_data / setup_filename), "r") as input_file:
-            data = json.load(input_file)
-            assert self.city == data["city"], "Data file does not match city."
-
-            # LP note: smooth this later -- not all of these attributes
-            #   are actually used and some of them are redundant
-            for (k, v) in data.items():
-                setattr(self, k, v)
-
-
-            # Load demographics information
-            self.N = np.array(data["population"])
-            self.I0 = np.array(data["IY_ini"])
-
-            # Load simulation dates
-            self.start_date = dt.datetime.strptime(
-                data["start_date"], datetime_formater
-            )
-
-            self.end_date = dt.datetime.strptime(
-                data["end_date"], datetime_formater)
-
-            # the school_closure_period attribute is a list (of lists) indicating
-            #   historical periods of school closure
-            # each element of the list is a 2-element list,
-            #   where the 1st element corresponds to the start date of school closure
-            #   and the 2nd element corresponds to the end date of school closure
-            self.school_closure_period = []
-            for blSc in range(len(data["school_closure"])):
-                self.school_closure_period.append(
-                    [
-                        dt.datetime.strptime(
-                            data["school_closure"][blSc][0], datetime_formater
-                        ),
-                        dt.datetime.strptime(
-                            data["school_closure"][blSc][1], datetime_formater
-                        ),
-                    ]
-                )
-
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Set up base_epi
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        self.base_epi = EpiSetup(data["epi_params"])
-
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-        # Load hospitalization-related data
-        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         hosp_related_data_filenames = (hospitalization_filename,
                                        hosp_icu_filename,
                                        hosp_admission_filename,
@@ -199,13 +145,8 @@ class City:
                                                "real_ToICUD_history",
                                                "real_ToIYD_history")
 
-        for i in range(len(hosp_related_data_filenames)):
-            filename = hosp_related_data_filenames[i]
-            var = real_history_hosp_related_data_vars[i]
-            if filename is not None:
-                setattr(self, var, self.read_hosp_related_data(filename))
-            else:
-                setattr(self, var, None)
+        self.load_hosp_related_data(hosp_related_data_filenames,
+                                    real_history_hosp_related_data_vars)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Load prevalence data
@@ -230,7 +171,7 @@ class City:
         self.L = len(self.N[0])
 
         # Maximum simulation length
-        self.T = 1 + (self.end_date - self.start_date).days
+        self.T = 1 + (self.simulation_end_date - self.simulation_start_date).days
 
         self.otherInfo = {}
 
@@ -249,7 +190,21 @@ class City:
 
         self.cal = self.build_calendar(transmission_filename)
 
-    def read_hosp_related_data(self, hosp_filename):
+        self.load_other_info(transmission_filename)
+
+    def load_config(self, config_filename):
+        with open(str(self.path_to_data / config_filename), "r") as input_file:
+            self.config = json.load(input_file)
+
+    def load_hosp_related_data(self, hosp_related_data_filenames,
+                               real_history_hosp_related_data_vars):
+
+        for i in range(len(hosp_related_data_filenames)):
+            filename = hosp_related_data_filenames[i]
+            var = real_history_hosp_related_data_vars[i]
+            setattr(self, var, self.read_hosp_file(filename))
+
+    def read_hosp_file(self, hosp_filename):
         '''
         Helper function to read a hospitalization data file
             and return an array with hospitalization counts.
@@ -261,56 +216,101 @@ class City:
             date_parser=pd.to_datetime,
         )
 
-        df_hosp = df_hosp[df_hosp["date"] <= self.end_date]
+        df_hosp = df_hosp[df_hosp["date"] <= self.simulation_end_date]
 
-        # if hospitalization data starts before self.start_date
-        if df_hosp["date"][0] <= self.start_date:
-            df_hosp = df_hosp[df_hosp["date"] >= self.start_date]
+        # if hospitalization data starts before self.simulation_start_date
+        if df_hosp["date"][0] <= self.simulation_start_date:
+            df_hosp = df_hosp[df_hosp["date"] >= self.simulation_start_date]
             df_hosp = list(df_hosp["hospitalized"])
         else:
-            df_hosp = [0] * (df_hosp["date"][0] - self.start_date).days + list(
+            df_hosp = [0] * (df_hosp["date"][0] - self.simulation_start_date).days + list(
                 df_hosp["hospitalized"]
             )
         return df_hosp
+
+    def load_setup_data(self, setup_filename):
+        with open(str(self.path_to_data / setup_filename), "r") as input_file:
+            data = json.load(input_file)
+            assert self.city == data["city"], "Data file does not match city."
+
+            # LP note: smooth this later -- not all of these attributes
+            #   are actually used and some of them are redundant
+            for (k, v) in data.items():
+                setattr(self, k, v)
+
+            # Load demographics information
+            self.N = np.array(data["population"])
+            self.I0 = np.array(data["IY_ini"])
+
+            # Load simulation dates
+            self.simulation_start_date = dt.datetime.strptime(
+                data["simulation_start_date"], datetime_formater
+            )
+
+            self.simulation_end_date = dt.datetime.strptime(
+                data["simulation_end_date"], datetime_formater)
+
+            # the school_closure_period attribute is a list (of lists) indicating
+            #   historical periods of school closure
+            # each element of the list is a 2-element list,
+            #   where the 1st element corresponds to the start date of school closure
+            #   and the 2nd element corresponds to the end date of school closure
+            self.school_closure_period = []
+            for blSc in range(len(data["school_closure"])):
+                self.school_closure_period.append(
+                    [
+                        dt.datetime.strptime(
+                            data["school_closure"][blSc][0], datetime_formater
+                        ),
+                        dt.datetime.strptime(
+                            data["school_closure"][blSc][1], datetime_formater
+                        ),
+                    ]
+                )
+
+            self.epi_rand = None
+            self.base_epi = EpiSetup(data["epi_params"])
 
     def build_calendar(self, transmission_filename):
         """
         Compute couple parameters (i.e., parameters that depend on the input)
         and build the simulation calendar.
         """
-        try:
-            df_transmission = pd.read_csv(
-                str(self.path_to_data / transmission_filename),
-                parse_dates=["date"],
-                date_parser=pd.to_datetime,
-                float_precision="round_trip",
+        df_transmission = pd.read_csv(
+            str(self.path_to_data / transmission_filename),
+            parse_dates=["date"],
+            date_parser=pd.to_datetime,
+            float_precision="round_trip",
+        )
+        transmission_reduction = [
+            (d, tr)
+            for (d, tr) in zip(
+                df_transmission["date"], df_transmission["transmission_reduction"]
             )
-            transmission_reduction = [
-                (d, tr)
-                for (d, tr) in zip(
-                    df_transmission["date"], df_transmission["transmission_reduction"]
-                )
-            ]
+        ]
 
-            try:
-                cocooning = [
-                    (d, co)
-                    for (d, co) in zip(
-                        df_transmission["date"], df_transmission["cocooning"]
-                    )
-                ]
-            except:
-                cocooning = [(d, 0.0) for d in df_transmission["date"]]
+        cocooning = [
+            (d, co)
+            for (d, co) in zip(
+                df_transmission["date"], df_transmission["cocooning"]
+            )
+        ]
 
-        except FileNotFoundError:
-            # Initialize empty if no file available
-            transmission_reduction = []
-
-        cal = SimCalendar(self.start_date, self.T,
+        cal = SimCalendar(self.simulation_start_date, self.T,
                           self.school_closure_period,
                           transmission_reduction, cocooning,
-                          self.weekday_holidays, self.weekday_longholidays,
-                          self.real_IH_history)
+                          self.weekday_holidays, self.weekday_longholidays)
+
+        return cal
+
+    def load_other_info(self, transmission_filename):
+
+        df_transmission = pd.read_csv(
+            str(self.path_to_data / transmission_filename),
+            parse_dates=["date"],
+            date_parser=pd.to_datetime,
+            float_precision="round_trip",
+        )
 
         for dfk in df_transmission.keys():
             if (
@@ -320,10 +320,9 @@ class City:
             ):
                 self.otherInfo[dfk] = {}
                 for (d, dfv) in zip(df_transmission["date"], df_transmission[dfk]):
-                    if d in cal.calendar_ix:
-                        d_ix = cal.calendar_ix[d]
+                    if d in self.cal.calendar_ix:
+                        d_ix = self.cal.calendar_ix[d]
                         self.otherInfo[dfk][d_ix] = dfv
-        return cal
 
 
 class TierInfo:
@@ -703,30 +702,20 @@ class EpiSetup:
 
         # See Yang et al. (2021) and Arslan et al. (2021)
 
-        # tau: proportion of exposed individuals who become symptomatic
-        # mu_ICU: rate from ICU to death (for each age group)
-
-        # IFR: infected fatality ratio (%)
-
         self.beta = self.beta0  # Unmitigated transmission rate
         self.YFR = self.IFR / self.tau  # symptomatic fatality ratio (%)
-        self.pIH0 = self.pIH
+        self.pIH0 = self.pIH # percent of patients going directly to general ward
         self.YHR0 = self.YHR  # % of symptomatic infections that go to hospital
         self.YHR_overall0 = self.YHR_overall
 
-        # if gamma_IH and mu are lists, reshape them for right dimension
-        if isinstance(self.gamma_IH, np.ndarray):
-            self.gamma_IH = self.gamma_IH.reshape(self.gamma_IH.size, 1)
-            self.gamma_IH0 = self.gamma_IH.copy()
-        if isinstance(self.etaICU, np.ndarray):
-            self.etaICU = self.etaICU.reshape(self.etaICU.size, 1)
-            self.etaICU0 = self.etaICU.copy()
-        if isinstance(self.gamma_ICU, np.ndarray):
-            self.gamma_ICU = self.gamma_ICU.reshape(self.gamma_ICU.size, 1)
-            self.gamma_ICU0 = self.gamma_ICU.copy()
-        if isinstance(self.mu_ICU, np.ndarray):
-            self.mu_ICU = self.mu_ICU.reshape(self.mu_ICU.size, 1)
-            self.mu_ICU0 = self.mu_ICU.copy()
+        self.gamma_IH = self.gamma_IH.reshape(self.gamma_IH.size, 1)
+        self.gamma_IH0 = self.gamma_IH.copy()
+        self.etaICU = self.etaICU.reshape(self.etaICU.size, 1)
+        self.etaICU0 = self.etaICU.copy()
+        self.gamma_ICU = self.gamma_ICU.reshape(self.gamma_ICU.size, 1)
+        self.gamma_ICU0 = self.gamma_ICU.copy()
+        self.mu_ICU = self.mu_ICU.reshape(self.mu_ICU.size, 1)
+        self.mu_ICU0 = self.mu_ICU.copy()
 
         self.update_YHR_params()
         self.update_nu_params()
@@ -750,6 +739,7 @@ class EpiSetup:
                 setattr(self, k, v * getattr(self, k))
         self.update_YHR_params()
         self.update_nu_params()
+
         self.gamma_ICU = self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
         self.gamma_IH = self.gamma_IH0 * (1 - self.alpha_IH)
         self.mu_ICU = self.mu_ICU0 * (1 + self.alpha_mu_ICU)
