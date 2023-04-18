@@ -169,7 +169,7 @@ class MultiTierPolicy:
         lockdown_thresholds (list of list): a list with the thresholds for every
             tier. The list must have n-1 elements if there are n tiers. Each threshold
             is a list of values for evert time step of simulation.
-        community_tranmission: (deprecated) CDC's old community tranmission threshold for staging.
+        community_transmission: (deprecated) CDC's old community transmission threshold for staging.
                                 Not in use anymore.
     """
 

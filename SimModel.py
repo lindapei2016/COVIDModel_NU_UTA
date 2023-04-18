@@ -333,10 +333,10 @@ class SimReplication:
                     #   already have total_imbalance assertion later --
                     #   might want to uncomment or consider making this a toggle
                     #   for debugging purposes
-                    # assert (getattr(v_group, attribute) > -1e-2).all(), \
-                    #     f"fPop negative value of {getattr(v_group, attribute)} " \
-                    #     f"on compartment {v_group.v_name}.{attribute} at time " \
-                    #     f"{self.instance.cal.calendar[t]}, {t}"
+                    assert (getattr(v_group, attribute) > -1e-2).all(), \
+                        f"fPop negative value of {getattr(v_group, attribute)} " \
+                        f"on compartment {v_group.v_name}.{attribute} at time " \
+                        f"{self.instance.cal.calendar[t]}, {t}"
 
                 setattr(self, attribute, sum_across_vaccine_groups)
 

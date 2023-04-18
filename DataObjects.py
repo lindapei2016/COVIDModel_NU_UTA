@@ -250,10 +250,10 @@ class City:
         self.cal = self.build_calendar(transmission_filename)
 
     def read_hosp_related_data(self, hosp_filename):
-        '''
+        """
         Helper function to read a hospitalization data file
             and return an array with hospitalization counts.
-        '''
+        """
 
         df_hosp = pd.read_csv(
             str(self.path_to_data / hosp_filename),
@@ -715,28 +715,19 @@ class EpiSetup:
         self.YHR_overall0 = self.YHR_overall
 
         # if gamma_IH and mu are lists, reshape them for right dimension
-        if isinstance(self.gamma_IH, np.ndarray):
-            self.gamma_IH = self.gamma_IH.reshape(self.gamma_IH.size, 1)
-            self.gamma_IH0 = self.gamma_IH.copy()
+        if isinstance(self.gamma_IH0, np.ndarray):
+            self.gamma_IH0 = self.gamma_IH0.reshape(self.gamma_IH0.size, 1)
+
         if isinstance(self.etaICU, np.ndarray):
             self.etaICU = self.etaICU.reshape(self.etaICU.size, 1)
             self.etaICU0 = self.etaICU.copy()
-        if isinstance(self.gamma_ICU, np.ndarray):
-            self.gamma_ICU = self.gamma_ICU.reshape(self.gamma_ICU.size, 1)
-            self.gamma_ICU0 = self.gamma_ICU.copy()
-        if isinstance(self.mu_ICU, np.ndarray):
-            self.mu_ICU = self.mu_ICU.reshape(self.mu_ICU.size, 1)
-            self.mu_ICU0 = self.mu_ICU.copy()
 
-        self.update_YHR_params()
-        self.update_nu_params()
+        if isinstance(self.gamma_ICU0, np.ndarray):
+            self.gamma_ICU0 = self.gamma_ICU0.reshape(self.gamma_ICU0.size, 1)
 
-        # Formerly updated under update_hosp_duration() function in original code
-        # See Yang et al. (2021) pg. 9 -- add constant parameters (alphas)
-        #   to better estimate durations in ICU and general ward.
-        self.gamma_ICU = self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
-        self.gamma_IH = self.gamma_IH0 * (1 - self.alpha_IH)
-        self.mu_ICU = self.mu_ICU0 * (1 + self.alpha_mu_ICU)
+        if isinstance(self.mu_ICU0, np.ndarray):
+            self.mu_ICU0 = self.mu_ICU0.reshape(self.mu_ICU0.size, 1)
+        self.HICUR0 = self.HICUR
 
     def variant_update_param(self, new_params):
         """
@@ -748,20 +739,22 @@ class EpiSetup:
                 setattr(self, k, v)
             else:
                 setattr(self, k, v * getattr(self, k))
-        self.update_YHR_params()
-        self.update_nu_params()
-        self.gamma_ICU = self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
-        self.gamma_IH = self.gamma_IH0 * (1 - self.alpha_IH)
-        self.mu_ICU = self.mu_ICU0 * (1 + self.alpha_mu_ICU)
+
+    @property
+    def gamma_ICU(self):
+        return self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
+
+    @property
+    def gamma_IH(self):
+        return self.gamma_IH0 * (1 - self.alpha_IH)
+
+    @property
+    def mu_ICU(self):
+        return self.mu_ICU0 * (1 + self.alpha_mu_ICU)
 
     def update_icu_params(self, rdrate):
         # update the ICU admission parameter HICUR and update nu
         self.HICUR = self.HICUR * rdrate
-        self.nu = (
-                self.gamma_IH
-                * self.HICUR
-                / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
-        )
         self.pIH = 1 - (1 - self.pIH) * rdrate
 
     def update_icu_all(self, t, otherInfo):
@@ -780,16 +773,11 @@ class EpiSetup:
                 self.etaICU = self.etaICU0.copy() / otherInfo["etaICU"][t]
             else:
                 self.etaICU = self.etaICU0.copy()
-        self.nu = (
-                self.gamma_IH
-                * self.HICUR
-                / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
-        )
 
-    def update_YHR_params(self):
-        # Arslan et al. (2021) pg. 7
-        # omega_P: infectiousness of pre-symptomatic relative to symptomatic
-        self.omega_P = np.array(
+    @property
+    def omega_P(self):
+        """ infectiousness of pre-symptomatic relative to symptomatic """
+        return np.array(
             [
                 (
                         self.tau
@@ -800,18 +788,27 @@ class EpiSetup:
                         )
                         + (1 - self.tau) * self.omega_IA / self.gamma_IA
                 )
-                / (self.tau * self.omega_IY + (1 - self.tau) * self.omega_IA)
-                * self.rho_Y
+                / (self.tau * self.omega_IY / self.rho_Y + (1 - self.tau) * self.omega_IA / self.rho_A)
                 * self.pp
                 / (1 - self.pp)
                 for a in range(len(self.YHR_overall))
             ]
         )
-        self.omega_PA = self.omega_IA * self.omega_P
-        self.omega_PY = self.omega_IY * self.omega_P
 
-        # pi is computed using risk based hosp rate
-        self.pi = np.array(
+    @property
+    def omega_PA(self):
+        """ infectiousness of pre-asymptomatic individuals relative to IA for age-risk group a, r """
+        return self.omega_IA * self.omega_P
+
+    @property
+    def omega_PY(self):
+        """ infectiousness of pre-symptomatic individuals relative to IY for age-risk group a, r"""
+        return self.omega_IY * self.omega_P
+
+    @property
+    def pi(self):
+        """ rate-adjusted proportion of symptomatic individuals who go to the hospital for age-risk group a, r """
+        return np.array(
             [
                 self.YHR[a]
                 * self.gamma_IY
@@ -820,28 +817,19 @@ class EpiSetup:
             ]
         )
 
-        # symptomatic fatality ratio divided by symptomatic hospitalization rate
-        self.HFR = self.YFR / self.YHR
+    @property
+    def nu(self):
+        """ rate-adjusted proportion of general ward patients transferred to ICU for age group a """
+        return self.gamma_IH * self.HICUR / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
 
-    def update_nu_params(self):
-        try:
-            self.HICUR0 = self.HICUR
-            self.nu = (
-                    self.gamma_IH
-                    * self.HICUR
-                    / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
-            )
-            self.nu_ICU = (
-                    self.gamma_ICU
-                    * self.ICUFR
-                    / (self.mu_ICU + (self.gamma_ICU - self.mu_ICU) * self.ICUFR)
-            )
-        except:
-            self.nu = (
-                    self.gamma_IH
-                    * self.HFR
-                    / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HFR)
-            )
+    @property
+    def HFR(self):
+        """ symptomatic fatality ratio divided by symptomatic hospitalization rate """
+        return self.YFR / self.YHR
+
+    @property
+    def nu_ICU(self):
+        return self.gamma_ICU0 * self.ICUFR / (self.mu_ICU0 + (self.gamma_ICU0 - self.mu_ICU0) * self.ICUFR)
 
     def effective_phi(self, school, cocooning, social_distance, demographics, day_type):
         """
