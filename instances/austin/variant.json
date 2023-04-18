@@ -14,12 +14,12 @@
           }
         },
         "alpha_gamma_ICU": {
-            "delta": -1.17068,
-            "omicron": 4.45455
+            "delta": -0.85,
+            "omicron": 4.4
         },
         "alpha_IH": {
             "delta": 1,
-            "omicron": 1.73877
+            "omicron": 1.0
         },
         "alpha_mu_ICU": {
             "delta":  0.7,
@@ -88,7 +88,7 @@
                 "delta": 0.95,
                 "omicron": 0.70
             }
-        },
+        }
       
     }
 }
