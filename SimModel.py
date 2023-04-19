@@ -446,14 +446,15 @@ class SimReplication:
         get_binomial_transition_quantity = self.get_binomial_transition_quantity
 
         rate_E = discrete_approx(epi.sigma_E, step_size)
-
+        nu_ICU = epi.nu_ICU
+        nu = epi.nu
         rate_IAR = discrete_approx(np.full((A, L), epi.gamma_IA), step_size)
         rate_PAIA = discrete_approx(np.full((A, L), epi.rho_A), step_size)
         rate_PYIY = discrete_approx(np.full((A, L), epi.rho_Y), step_size)
-        rate_IHICU = discrete_approx(epi.nu * epi.etaICU, step_size)
-        rate_IHR = discrete_approx((1 - epi.nu) * epi.gamma_IH, step_size)
-        rate_ICUD = discrete_approx(epi.nu_ICU * epi.mu_ICU, step_size)
-        rate_ICUR = discrete_approx((1 - epi.nu_ICU) * epi.gamma_ICU, step_size)
+        rate_IHICU = discrete_approx(nu * epi.etaICU, step_size)
+        rate_IHR = discrete_approx((1 - nu) * epi.gamma_IH, step_size)
+        rate_ICUD = discrete_approx(nu_ICU * epi.mu_ICU, step_size)
+        rate_ICUR = discrete_approx((1 - nu_ICU) * epi.gamma_ICU, step_size)
         rate_immune = discrete_approx(immune_evasion, step_size)
 
         for _t in range(step_size):
