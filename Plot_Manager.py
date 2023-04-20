@@ -54,7 +54,7 @@ class Plot:
         self.policy_name = policy_name
         self.central_path = central_path
         self.T = len(np.sum(sim_data[0], axis=(1, 2)))
-        self.T_real = (real_history_end_date - instance.start_date).days
+        self.T_real = (real_history_end_date - instance.simulation_start_date).days
         self.text_size = text_size
 
         with open(str(base_path / "instances" / f"{instance.city}" / "plot_info.json"), "r") as input_file:
