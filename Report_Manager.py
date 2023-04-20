@@ -118,7 +118,7 @@ class Report:
                 sum(tier_hist > 0) / len(tier_hist), 4)
             tier_hist_list.append(tier_hist)
 
-        self.report_data['BAR_PLOT'] = self.plot_tier_bar(tier_hist_list)
+        self.report_data['BAR_PLOT'] = self.plot_tier_bar(tier_hist_list, self.report_data[f"MEAN-ICU-PEAK"])
 
     def generate_report(self):
         """
@@ -168,7 +168,7 @@ class Report:
         else:
             return f"Staged Alert-{self.policy_data['lockdown_thresholds'][-1]}"
 
-    def plot_tier_bar(self, tier_hist_list: list):
+    def plot_tier_bar(self, tier_hist_list: list, peak_icu_demand):
         """
         Plots histograms of average proportion of days each tier was active.
         :param tier_hist_list: total number of days each tier was active for each sample paths.
@@ -176,12 +176,23 @@ class Report:
         """
         tier_hist_mean = [np.mean(tier) / (self.T_end - self.T_start) for tier in tier_hist_list]
         fig, ax = plt.subplots()
-        ax.bar([i for i in range(len(self.tier_colors))], tier_hist_mean, color=self.tier_colors.values())
+        ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis for peak ICU demand.
+
+        val = [i for i in range(len(self.tier_colors))]
+        col = list(self.tier_colors.values())
+        labels = [f"Stage {i+1}" for i in range(len(self.tier_colors))]
+        ax.bar(val, tier_hist_mean, color=col, label=labels)
+        ax2.bar(len(self.tier_colors), peak_icu_demand, color="gray", label="Peak ICU")
         ax.set_ylabel("Proportion of days")
         ax.set_ylim(0, 1)
+        ax2.set_ylabel("Peak ICU Demand")
+        ax2.set_ylim(0, 300)
+        ax.set_xticks([])
+        lines, labels = ax.get_legend_handles_labels()
+        lines2, labels2 = ax2.get_legend_handles_labels()
+        ax2.legend(lines + lines2, labels + labels2, loc="upper left", fontsize="12")
         plot_filename = self.path_to_report / f"bar_{self.report_data['instance_name']}_{self.trigger_summary()}_{self.stats_start_date.date()}.pdf"
         plt.tight_layout()
         plt.subplots_adjust(hspace=0)
         plt.savefig(plot_filename)
         return plot_filename
-
