@@ -506,10 +506,10 @@ def evaluate_single_policy_on_sample_path(city: object,
         export_rep_to_json(
             base_rep,
             json_filename + str(policy) + "_sim_updated.json",
-            json_filename + str(policy) + "_v0_scratch.json",
-            json_filename + str(policy) + "_v1_scratch.json",
-            json_filename + str(policy) + "_v2_scratch.json",
-            json_filename + str(policy) + "_v3_scratch.json",
+            None,
+            None,
+            None,
+            None,
             json_filename + str(policy) + "_policy.json"
         )
 

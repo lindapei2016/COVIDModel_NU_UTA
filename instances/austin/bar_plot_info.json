@@ -1,0 +1,24 @@
+{"plot_name": "percent_stages",
+  "ylabel_ax2": "Peak ICU Demand (Patients)",
+  "ylabel_ax1": "Proportion of days",
+  "ylim_ax1": [0, 1],
+  "ylim_ax2": [0, 250],
+  "color_map": {
+    "Blue stage (CDC low)": 0,
+    "Yellow stage": 1,
+    "CDC medium": 2,
+    "Orange stage": 3,
+    "Red stage (CDC high)": 4,
+    "Peak ICU": 5
+  },
+  "color_labels_ax1": {
+    "blue": "Blue stage (CDC low)",
+    "yellow": "Yellow stage",
+    "orange": "Orange stage",
+    "gold": "CDC medium",
+    "red": "Red stage (CDC high)"},
+  "color_labels_ax2": {
+    "gray": "Peak ICU"
+  },
+  "year_ticks": ["First peak", "Second peak", "Third peak", "Fourth peak"]
+}

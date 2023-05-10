@@ -86,13 +86,15 @@ class CDCTierPolicy:
         self.percentage_cases = percentage_cases
         self.tier_history = None
         self.surge_history = None
+        self.active_indicator_history = []
 
     def reset(self):
         self.tier_history = None
         self.surge_history = None
+        self.active_indicator_history = []
 
     def __repr__(self):
-        return f"CDC_{self.case_threshold}"
+        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds['non_surge'][0]}_{self.staffed_bed_thresholds['non_surge'][0]}"
 
     def __call__(self, t, ToIHT, IH, ToIY, ICU):
         N = self._instance.N
@@ -100,6 +102,7 @@ class CDCTierPolicy:
         if self.tier_history is None:
             self.tier_history = [None for i in range(t)]
             self.surge_history = [None for i in range(t)]
+            self.active_indicator_history = [None for i in range(t)]
         if len(self.tier_history) > t:
             return
 
@@ -143,6 +146,13 @@ class CDCTierPolicy:
 
         # choose the stricter tier among tiers the two indicators suggesting:
         new_tier = max(hosp_adm_tier, staffed_bed_tier)
+        # keep track of the active indicator for indicator statistics:
+        if hosp_adm_tier > staffed_bed_tier:
+            active_indicator = 0
+        elif hosp_adm_tier < staffed_bed_tier:
+            active_indicator = 1
+        else:
+            active_indicator = 2
 
         if current_tier != new_tier:  # bump to the next tier
             t_end = t + self.tiers[new_tier]["min_enforcing_time"]
@@ -152,6 +162,7 @@ class CDCTierPolicy:
 
         self.tier_history += [new_tier for i in range(t_end - t)]
         self.surge_history += [surge_state for i in range(t_end - t)]
+        self.active_indicator_history += [active_indicator for i in range(t_end - t)]
 
 
 class MultiTierPolicy:

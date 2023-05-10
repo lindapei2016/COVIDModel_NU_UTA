@@ -9,27 +9,61 @@ base_path = Path(__file__).parent
 
 plt.rcParams["font.size"] = "18"
 
+
 ######################################################################################
 # Plotting Module
 
 
-def find_central_path(sim_data_ICU, sim_data_IH, real_data, T_real):
+def find_central_path(sim_data_ICU, sim_data_IH, real_data, T_real: int):
+    # Trim real data to T_real time steps
     real_data = real_data[: T_real]
-    num_rep = len(sim_data_ICU)
-    sim_data = [np.sum(sim_data_ICU[s], axis=(1, 2))[: T_real] + np.sum(sim_data_IH[s], axis=(1, 2))[: T_real]
-                for s in range(num_rep)
-                ]
 
-    rsq = [1 - np.sum(((np.array(sim) - np.array(real_data)) ** 2)) / sum(
-        (np.array(real_data) - np.mean(np.array(real_data))) ** 2
-    ) for sim in sim_data]
+    # Compute simulated data
+    num_rep = len(sim_data_ICU)
+    sim_data = []
+    for s in range(num_rep):
+        sim_ICU = np.sum(sim_data_ICU[s], axis=(1, 2))[:T_real]
+        sim_IH = np.sum(sim_data_IH[s], axis=(1, 2))[:T_real]
+        sim_total = sim_ICU + sim_IH
+        sim_data.append(sim_total)
+
+    # Compute R-squared for each simulation
+    rsq = []
+    for sim in sim_data:
+        numerator = np.sum((sim - real_data) ** 2)
+        denominator = np.sum((real_data - np.mean(real_data)) ** 2)
+        rsq.append(1 - numerator / denominator)
+
+    # Find index of simulation with highest R-squared
     central_path_id = np.argmax(rsq)
     return central_path_id
 
 
+def moving_avg(data, n_day, percent=1):
+    """
+    Take the n-day moving average of data.
+    (Add percentage for percent of staffed inpatient beds).
+    :return:
+    """
+
+    return [data[max(0, i - n_day): i].mean() / percent if i - n_day > 0 else 0 for i in range(len(data))]
+
+
+def moving_sum(data, n_day, total_population):
+    """
+    Take the n-day moving sum per 100k of the simulation data.
+    :return:
+    """
+    return [data[max(0, i - n_day): i].sum() * 100000 / total_population if i - n_day > 0 else 0 for i in range(len(data))]
+
+
+######################################################################################
+
+
 class Plot:
     """
-    Plots a list of sample paths in the same figure with different plot backgrounds.
+    This class is for plotting historical simulation results/projections etc. for a single simulation run.
+    Plot a list of sample paths in the same figure with different plot backgrounds.
     """
 
     def __init__(self,
@@ -45,16 +79,21 @@ class Plot:
 
         self.instance = instance
         self.real_history_end_date = real_history_end_date
-        self.real_data = real_data
-        if var == "ToIY_history_sum":
-            self.sim_data = [np.sum(s, axis=(1, 2)) * 0.4 for s in sim_data]
+        # TODO: fix this part later:
+        if sim_data is not None:
+            if var == "ToIY_history_sum":
+                self.sim_data = [np.sum(s, axis=(1, 2)) * 0.4 for s in sim_data]
+            else:
+                self.sim_data = [np.sum(s, axis=(1, 2)) for s in sim_data]
         else:
-            self.sim_data = [np.sum(s, axis=(1, 2)) for s in sim_data]
+            self.sim_data = None
+
         self.var = var
         self.policy_name = policy_name
         self.central_path = central_path
         self.T = len(np.sum(sim_data[0], axis=(1, 2)))
         self.T_real = (real_history_end_date - instance.simulation_start_date).days
+        self.real_data = np.array(real_data[0:self.T_real]) if real_data is not None else None
         self.text_size = text_size
 
         with open(str(base_path / "instances" / f"{instance.city}" / "plot_info.json"), "r") as input_file:
@@ -62,6 +101,11 @@ class Plot:
             self.y_lim = data["y_lim"]
             self.compartment_names = data["compartment_names"]
 
+        self.path_to_plot = base_path / "plots"
+
+        self.fig, (self.ax1, self.actions_ax) = plt.subplots(2, 1, figsize=(17, 9),
+                                                             gridspec_kw={'height_ratios': [10, 1.1]})
+        self.policy_ax = self.ax1.twinx()
         self.base_plot(color)
 
     def base_plot(self, color):
@@ -69,16 +113,32 @@ class Plot:
         The base plotting function sets the common plot design for different type of plots.
         :return:
         """
-        self.path_to_plot = base_path / "plots"
-
-        self.fig, (self.ax1, self.actions_ax) = plt.subplots(2, 1, figsize=(17, 9),
-                                                             gridspec_kw={'height_ratios': [10, 1.1]})
-        self.policy_ax = self.ax1.twinx()
-
+        if self.var == 'IH_history_average':
+            percent = self.instance.hosp_beds
+        else:
+            percent = 1
         if 'Seven-day Average' in self.compartment_names[self.var]:
-            self.moving_avg()
+            n_day = self.instance.config["moving_avg_len"]
+            # Compute moving averages for simulation data
+            self.sim_data = np.apply_along_axis(
+                lambda s: moving_avg(s, n_day, percent),
+                axis=1,
+                arr=self.sim_data
+            )
+            if self.real_data is not None:
+                self.real_data = moving_avg(self.real_data.copy(), n_day, percent)
+
         elif 'Seven-day Sum' in self.compartment_names[self.var]:
-            self.moving_sum()
+            n_day = self.instance.config["moving_avg_len"]
+            N = np.sum(self.instance.N, axis=(0, 1))
+            self.sim_data = np.apply_along_axis(
+                lambda s: moving_sum(s, n_day, N),
+                axis=1,
+                arr=self.sim_data
+            )
+
+            if self.real_data is not None:
+                self.real_data = moving_sum(self.real_data.copy(), n_day, N)
 
         if self.real_data is not None:
             real_h_plot = self.ax1.scatter(range(self.T_real), self.real_data[0:self.T_real], color='maroon',
@@ -88,8 +148,8 @@ class Plot:
         self.ax1.plot(range(self.T), self.sim_data[self.central_path], color[0])
 
         # plot a vertical line to separate history from projections:
-        self.ax1.vlines(self.T_real, 0, self.y_lim[self.var], colors='k', linewidth=3)
-
+        # self.ax1.vlines(self.T_real, 0, self.y_lim[self.var], colors='k', linewidth=3)
+        self.ax1.vlines(self.instance.cal.calendar.index(dt(2021, 11, 30)), 0, self.y_lim[self.var], colors='k', linewidth=3)
         # Plot styling:
         # Axis limits:
         self.ax1.set_ylim(0, self.y_lim[self.var])
@@ -107,46 +167,11 @@ class Plot:
 
         # Axis ticks.
         if "Percent" in self.compartment_names[self.var]:
-            self.ax1.yaxis.set_ticks(np.arange(0, 1.001, 0.2))
+            self.ax1.yaxis.set_ticks(np.arange(0, self.y_lim[self.var] + 0.01, 0.2))
             self.ax1.yaxis.set_ticklabels(
-                [f' {np.round(t * 100)}%' for t in np.arange(0, 1.001, 0.2)],
+                [f' {np.round(t * 100)}%' for t in np.arange(0, self.y_lim[self.var] + 0.01, 0.2)],
                 rotation=0,
                 fontsize=22)
-
-    def moving_avg(self):
-        """
-        Take the 7-day moving average of the data we are plotting.
-        (Add percentage for percent of staffed inpatient beds).
-        :return:
-        """
-        if self.var == 'IH_history_average':
-            percent = self.instance.hosp_beds
-        else:
-            percent = 1
-        n_day = self.instance.config["moving_avg_len"]
-        temp = self.sim_data.copy()
-        self.sim_data = [[s[max(0, i - n_day): i].mean() / percent if i > 0 else 0 for i in
-                          range(self.T)] for s in self.sim_data]
-
-        if self.real_data is not None:
-            real_data = np.array(self.real_data)
-            self.real_data = [real_data[0:self.T_real][max(0, i - n_day): i].mean() / percent if i > 0 else 0 for
-                              i in range(self.T_real)]
-
-    def moving_sum(self):
-        """
-        Take the 7-day moving sum per 100k of the data we are plotting.
-        :return:
-        """
-        n_day = self.instance.config["moving_avg_len"]
-        total_population = np.sum(self.instance.N, axis=(0, 1))
-        self.sim_data = [[s[max(0, i - n_day): i].sum() * 100000 / total_population
-                          if i > 0 else 0 for i in range(self.T)] for s in self.sim_data]
-
-        if self.real_data is not None:
-            real_data = np.array(self.real_data[0:self.T_real])
-            self.real_data = [real_data[max(0, i - n_day): i].sum() * 100000 / total_population
-                              if i > 0 else 0 for i in range(self.T_real)]
 
     def set_x_axis(self):
         """
@@ -154,10 +179,10 @@ class Plot:
         """
         # Axis ticks: write the name of the month on the x-axis:
         self.ax1.xaxis.set_ticks(
-            [t for t, d in enumerate(self.instance.cal.calendar) if (d.day == 1 and d.month % 2 == 1)]) # and d.month % 2 == 1
+            [t for t, d in enumerate(self.instance.cal.calendar) if (d.day == 1 and d.month % 2 == 1)])
         self.ax1.xaxis.set_ticklabels(
             [f' {py_cal.month_abbr[d.month]} ' for t, d in enumerate(self.instance.cal.calendar) if
-             (d.day == 1 and d.month % 2 == 1)],  # and d.month % 2 == 1
+             (d.day == 1 and d.month % 2 == 1)],
             rotation=0,
             fontsize=22)
 
@@ -231,13 +256,12 @@ class Plot:
 
         self.save_plot("horizontal")
 
-    def changing_horizontal_plot(self, surge_history, surge_states, thresholds, tier_colors):
+    def changing_horizontal_plot(self, surge_history, surge_states, thresholds, tier_colors: dict):
         """
         Plot the policy thresholds horizontally with corresponding policy colors.
         This plotting is used when plotting the CDC staged-alert system. The thresholds change over time
         according to the case count.
         Color the plot only for the part with projections where the transmission reduction is not fixed.
-        (I can combine this method with the horizontal plot later if necessary).
         """
         for u, state in enumerate(surge_states):
             fill = [True if s == u else False for s in surge_history[self.central_path][self.T_real:self.T]]
@@ -260,23 +284,33 @@ class Plot:
         self.save_plot("changing_horizontal")
 
     def save_plot(self, plot_type):
-        plt.savefig(self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.var}_{plot_type}.png")
+        """ Save the plot in a png format to /plots directory. """
+        plt.savefig(
+            self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.var}_{plot_type}.png",
+            bbox_inches='tight')
 
-    def vertical_plot(self, tier_history, tier_colors, cap_limit=0):
+    def vertical_plot(self, tier_history, tier_colors: dict, cap_limit=0):
         """
         Plot the historical policy vertically with corresponding policy colors.
         The historical policy can correspond to the five tiers or to the surge tiers in the CDC system.
 
         Color the plot only for the part with projections where the transmission reduction is not fixed.
-        (We used to have a color decide tool to decide on the color of a transmission reduction level if
-        it is in between to alert level. I can add that later if needed.)
+
+        Parameters
+        ----------
+        tier_history: historical alert-stages determined by the policy.
+        tier_colors: colors corresponding to each staged-alert level, e.g. blue, yellow etc.
+        cap_limit: capacity of a hospital recourse. e.g. ICU or general ward capacity.
+
+        Returns None
         """
+        policy_start_date = tier_history.count(None)
         for u in range(len(tier_colors)):
             u_color = tier_colors[u]
             u_alpha = 0.6
-            fill = np.array(tier_history[self.central_path][self.T_real:self.T]) == u
+            fill = np.array(tier_history[self.central_path][policy_start_date:self.T]) == u
             fill = [True if fill[i] or fill[i - 1] else False for i in range(len(fill))]
-            self.policy_ax.fill_between(range(self.T_real, self.T),
+            self.policy_ax.fill_between(range(policy_start_date, self.T),
                                         0,
                                         self.y_lim[self.var],
                                         where=fill,
@@ -284,20 +318,32 @@ class Plot:
                                         alpha=u_alpha,
                                         linewidth=0)
 
+            # Plot a horizontal black line to indicate the resource capacity:
             self.ax1.hlines(cap_limit, 0, self.T, colors='k', linewidth=3)
         self.save_plot("vertical")
 
-    def dali_plot(self, tier_history, tier_colors, cap_limit=0):
+    def dali_plot(self, tier_history, tier_colors: dict, cap_limit=0):
         """
         Plot the tier history colors. Different sample paths may be in different stages during the same time period.
         color the background to tier color according the percent of paths in that particular tier during a particular
         time. (e.g. if 40% of paths are in blue for a certain day then 40% of the background will be blue for that day.)
-        :return:
+
+        Color the plot only for the part with projections where the transmission reduction is not fixed.
+
+        Parameters
+        ----------
+        tier_history: historical alert-stages determined by the policy.
+        tier_colors: colors corresponding to each staged-alert level, e.g. blue, yellow etc.
+        cap_limit: capacity of a hospital recourse. e.g. ICU or general ward capacity.
+
+        Returns None
         """
         bottom_tier = 0
+        policy_start_date = tier_history.count(None)
         for u in range(len(tier_colors)):
-            color_fill = (sum(np.array(t[self.T_real:self.T]) == u for t in tier_history) / len(tier_history)) * self.y_lim[self.var]
-            self.policy_ax.bar(range(self.T_real, self.T),
+            color_fill = (sum(np.array(t[policy_start_date:self.T]) == u for t in tier_history)
+                          / (len(tier_history) - policy_start_date)) * self.y_lim[self.var]
+            self.policy_ax.bar(range(policy_start_date, self.T),
                                color_fill,
                                color=tier_colors[u],
                                bottom=bottom_tier,
@@ -305,6 +351,139 @@ class Plot:
                                alpha=0.6,
                                linewidth=0)
             bottom_tier += np.array(color_fill)
+
+        # Plot a horizontal black line to indicate the resource capacity:
         self.ax1.hlines(cap_limit, 0, self.T, colors='k', linewidth=3)
         self.save_plot("dali")
 
+
+class BarPlot:
+    """
+    This class plots histogram of days spent in each stage to visually compare different policies.
+    """
+
+    def __init__(self, instance,
+                 plot_info_filename: str,
+                 label_dict: dict,
+                 data_ax1,
+                 tier_colors1: dict,
+                 data_ax2=None,
+                 tier_colors2=None):
+
+        self.instance = instance
+        self.label_dict = label_dict
+        self.data_ax1 = data_ax1
+        self.data_ax2 = data_ax2
+        self.tier_colors1 = tier_colors1
+        self.tier_colors2 = tier_colors2
+        self.path_to_plot = base_path / "plots"
+        self.fig, (self.ax, self.timeline_ax) = plt.subplots(2, 1,
+                                                             figsize=(17, 9),
+                                                             gridspec_kw={'height_ratios': [10, 1.1]})
+
+        with open(str(base_path / "instances" / f"{instance.city}" / plot_info_filename), "r") as input_file:
+            self.plot_info = json.load(input_file)
+        if data_ax2 is not None:
+            self.ax2 = self.ax.twinx()  # instantiate a second axes that shares the same x-axis for peak ICU demand.
+
+        self.xticks_location = []
+
+    def plot(self):
+        self.ax.set_ylabel(self.plot_info["ylabel_ax1"])
+        self.ax.set_ylim(self.plot_info["ylim_ax1"][0], self.plot_info["ylim_ax1"][1])
+
+        if self.data_ax2 is not None:
+            self.ax2.set_ylabel(self.plot_info["ylabel_ax2"])
+            self.ax2.set_ylim(self.plot_info["ylim_ax2"][0], self.plot_info["ylim_ax2"][1])
+
+        self.plot_tier_bar()
+        self.create_x_ticks()
+        self.create_legend()
+        self.save_to_file()
+
+    def plot_tier_bar(self):
+        """
+        Plots histograms of average proportion of days each tier was active.
+        :return: the plot filename.
+        """
+        count = 0
+        ite = 0
+        color_labels_ax1 = self.plot_info["color_labels_ax1"]
+        color_labels_ax2 = self.plot_info["color_labels_ax2"]
+        for pname, rdata in self.data_ax1.items():
+            val = [i + count for i in range(len(self.tier_colors1[pname[:-2]]))]
+            self.xticks_location += [(len(val)) / 2 + count]
+            col = list(self.tier_colors1[pname[:-2]].values())
+            labels_ax1 = [color_labels_ax1[i] for i in self.tier_colors1[pname[:-2]].values()]
+            self.ax.bar(val, rdata, color=col, label=labels_ax1)
+
+            if self.data_ax2 is not None:
+                labels_ax2 = [color_labels_ax2[i] for i in self.tier_colors2[pname[:-2]].values()]
+                self.ax2.bar(len(val) + count, self.data_ax2[pname], color="gray", label=labels_ax2)
+
+            count += len(val) + 2 + ite % 2
+            ite += 1
+
+    def create_x_ticks(self):
+        # Clean up the timeline_ax to write the years or peak names there:
+        self.timeline_ax.spines['top'].set_visible(False)
+        self.timeline_ax.spines['bottom'].set_visible(False)
+        self.timeline_ax.spines['left'].set_visible(False)
+        self.timeline_ax.spines['right'].set_visible(False)
+        self.ax.patch.set_visible(False)  # hide the 'canvas'
+        self.timeline_ax.tick_params(
+            axis='both',  # changes apply to the x-axis
+            which='both',  # both major and minor ticks are affected
+            bottom=False,  # ticks along the bottom edge are off
+            left=False,  # ticks along the top edge are off
+            labelbottom=False,
+            labelleft=False)  # labels along the bottom edge are off
+
+        year_ticks = self.plot_info["year_ticks"]
+        self.ax.xaxis.set_ticks(self.xticks_location)
+        self.ax.xaxis.set_ticklabels([pname for pname in self.label_dict.values()] * len(year_ticks),
+                                     rotation=0, fontsize="12")
+        self.timeline_ax.xaxis.set_ticks(self.xticks_location)
+        self.timeline_ax.xaxis.set_ticklabels([pname for pname in self.label_dict.values()] * len(year_ticks),
+                                              rotation=0,
+                                              fontsize="12")
+
+        start, end = min(self.xticks_location), max(self.xticks_location)
+        ticks = np.arange(start + 2, end + 2, (end - start) / len(year_ticks))
+        for i, key in enumerate(year_ticks):
+            self.timeline_ax.annotate(key,
+                                      xy=(ticks[i], 0),
+                                      xycoords='data',
+                                      color='k',
+                                      annotation_clip=True,
+                                      fontsize=20)
+
+        self.ax.tick_params(axis='y', labelsize=28, length=5, width=2)
+        self.ax.tick_params(axis='x', length=5, width=2)
+
+        self.ax.set_zorder(self.timeline_ax.get_zorder() + 10)  # put ax in front of policy_ax
+
+    def create_legend(self):
+        lines1, labels1 = self.ax.get_legend_handles_labels()
+        lines2, labels2 = self.ax2.get_legend_handles_labels()
+
+        labels = labels1 + labels2
+        lines = lines1 + lines2
+
+        label_line_dict = {label: line for label, line in zip(labels, lines)}
+
+        # Sort the label_line_dict based on the stages:
+        color_map = self.plot_info["color_map"]
+        sorted_label_line_dict = {k: v for k, v in sorted(label_line_dict.items(), key=lambda x: color_map[x[0]])}
+
+        unique_labels = list(sorted_label_line_dict.keys())
+        unique_lines = list(sorted_label_line_dict.values())
+
+        self.ax2.legend(unique_lines, unique_labels, loc="upper right", fontsize="15")
+
+    def save_to_file(self):
+        plot_filename = self.path_to_plot / f"{self.instance.city}_{self.plot_info['plot_name']}_bar_plot.pdf"
+        plt.tight_layout()
+        plt.subplots_adjust(hspace=0)
+        plt.savefig(plot_filename)
+        return plot_filename
