@@ -29,12 +29,6 @@
 \begin{document}
 
 %\maketitle
-\begin{figure}[!htb]
-  \centering
-   \includegraphics[width=0.5\linewidth]{BAR_PLOT}
-   \caption{\textbf{INSERT-TRIGGER-DESCRIPTION} Bar Plot of Tiers}
-      \label{fig:IHT}
-\end{figure}
  \textbf{Start date:} START-DATE,	
 \textbf{Statistics start date:} STATISTICS-START-DATE,
 \textbf{Statistics end date:} STATISTICS-END-DATE.
@@ -43,24 +37,24 @@
 	\begin{tabular}{p{4cm}cc}
 		\toprule
 		\multirow{3}{*}{Days of blue} & Mean      & MEAN-BLUE                     \\ \cmidrule(l){2-3} 
-		& 5\% Percentile    & P5-BLUE                      \\ \cmidrule(l){2-3} 
+		& 10\% Percentile    & P10-BLUE                      \\ \cmidrule(l){2-3} 
 		& Median    & P50-BLUE                     \\ \cmidrule(l){2-3} 
-		& 95\% Percentile    & P95-BLUE                          \\ \midrule 
+		& 90\% Percentile    & P90-BLUE                          \\ \midrule 
 		\multirow{1}{*}{Paths in blue ( \% )} &      &         PATHS-IN-BLUE                \\   \midrule
 		\multirow{3}{*}{Days of yellow} & Mean      & MEAN-YELLOW                       \\ \cmidrule(l){2-3} 
-		& 5\% Percentile    & P5-YELLOW                      \\ \cmidrule(l){2-3} 
+		& 10\% Percentile    & P10-YELLOW                      \\ \cmidrule(l){2-3} 
 		& Median    & P50-YELLOW                     \\ \cmidrule(l){2-3} 
-		& 95\% Percentile    & P95-YELLOW                     \\ \midrule    
+		& 90\% Percentile    & P90-YELLOW                     \\ \midrule    
 		\multirow{1}{*}{Paths in yellow ( \% )} &      &         PATHS-IN-YELLOW           \\   \midrule
 		\multirow{3}{*}{Days of orange} & Mean      & MEAN-ORANGE                    \\ \cmidrule(l){2-3} 
-		& 5\% Percentile    & P5-ORANGE                      \\ \cmidrule(l){2-3} 
+		& 10\% Percentile    & P10-ORANGE                      \\ \cmidrule(l){2-3} 
 		& Median    & P50-ORANGE                    \\ \cmidrule(l){2-3} 
-		& 95\% Percentile    & P95-ORANGE                      \\ \midrule    
+		& 90\% Percentile    & P90-ORANGE                      \\ \midrule    
 		\multirow{1}{*}{Paths in orange ( \% )} &      &         PATHS-IN-ORANGE              \\   \midrule
 		\multirow{3}{*}{Days of red} & Mean      & MEAN-RED                        \\ \cmidrule(l){2-3} 
-		& 5\% Percentile    & P5-RED                     \\ \cmidrule(l){2-3} 
+		& 10\% Percentile    & P10-RED                     \\ \cmidrule(l){2-3} 
 		& Median    & P50-RED                      \\ \cmidrule(l){2-3} 
-		& 95\% Percentile    & P95-RED                     \\   \midrule   
+		& 90\% Percentile    & P90-RED                     \\   \midrule   
 		\multirow{1}{*}{Paths in red ( \% )} &      &         PATHS-IN-RED            \\  \bottomrule
 	\end{tabular}
 	\caption{\textbf{INSERT-TRIGGER-DESCRIPTION} 

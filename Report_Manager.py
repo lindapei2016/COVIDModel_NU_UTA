@@ -8,6 +8,22 @@ base_path = Path(__file__).parent
 percentiles = [5, 50, 95, 99, 100]
 
 
+def sim_history_key_stats(sim_history, keys):
+    """
+    Calculate percentages of each key from the simulation data.
+    keys can be active indicators, stage levels etc.
+    Returns
+    -------
+    """
+    stats = []
+    for u in range(keys):
+        indicator_hist = np.array([np.sum(np.array(hist) == u) / (len(hist) - hist.count(None))
+                                   for hist in sim_history])
+        percent_key = np.mean(indicator_hist)
+        stats.append(percent_key)
+    return stats
+
+
 class Report:
     """
     Build a latex report for city statistics.
@@ -49,6 +65,7 @@ class Report:
         # Initialize the city report:
         self.report_data = {'instance_name': self.instance.city,
                             'CITY': self.instance.city,
+                            "POLICY-NAME": self.policy_data["policy_type"][0],
                             'STATISTICS-START-DATE': self.stats_start_date.strftime("%Y-%m-%d"),
                             'STATISTICS-END-DATE': self.stats_end_date.strftime("%Y-%m-%d")}
 
@@ -58,6 +75,8 @@ class Report:
         self.tier_stats()
         # Update the template latex file with statistics and create the new city file and run:
         self.generate_report()
+
+        return self.report_data
 
     def hospital_stats(self):
         """
@@ -110,15 +129,15 @@ class Report:
             lockdown_report.append({
                 f'MEAN-{tier_color.upper()}': f'{np.mean(tier_hist):.2f}',
                 f'P50-{tier_color.upper()}': f'{np.percentile(tier_hist, q=50)}',
-                f'P5-{tier_color.upper()}': f'{np.percentile(tier_hist, q=5)}',
-                f'P95-{tier_color.upper()}': f'{np.percentile(tier_hist, q=95)}'
+                f'P10-{tier_color.upper()}': f'{np.percentile(tier_hist, q=10)}',
+                f'P90-{tier_color.upper()}': f'{np.percentile(tier_hist, q=90)}'
             })
             self.report_data.update(lockdown_report[u])
             self.report_data[f'PATHS-IN-{tier_color.upper()}'] = 100 * round(
                 sum(tier_hist > 0) / len(tier_hist), 4)
             tier_hist_list.append(tier_hist)
 
-        self.report_data['BAR_PLOT'] = self.plot_tier_bar(tier_hist_list, self.report_data[f"MEAN-ICU-PEAK"])
+        self.report_data['TIER_HIST_LIST'] = tier_hist_list
 
     def generate_report(self):
         """
@@ -127,9 +146,9 @@ class Report:
         """
         instance_name = self.report_data['instance_name']
         tex_file = str(
-            self.path_to_report / f'report_{instance_name}_{self.trigger_summary()}_{self.stats_start_date.date()}.tex')
+            self.path_to_report / f"report_{instance_name}_{self.report_data['POLICY-NAME']}_{self.stats_start_date.date()}.tex")
 
-        pdf_file = f'report_{instance_name}_{self.trigger_summary()}_{self.stats_start_date.date()}.pdf'
+        pdf_file = f"report_{instance_name}_{self.report_data['POLICY-NAME']}_{self.stats_start_date.date()}.pdf"
         if not self.path_to_report.exists():
             os.system(f"mkdir {self.path_to_report}")
 
@@ -153,46 +172,8 @@ class Report:
 
         for k, v in self.report_data.items():
             tex_template = tex_template.replace(k, str(v), 1)
-
-        tex_template = tex_template.replace('INSERT-TRIGGER-DESCRIPTION', self.trigger_summary())
+        tex_template = tex_template.replace('INSERT-TRIGGER-DESCRIPTION', self.report_data['POLICY-NAME'])
 
         with open(report_file, 'w') as out_rep:
             out_rep.write(tex_template)
 
-    def trigger_summary(self):
-        """
-        Create the name of the report according to the stage alert system that is used.
-        """
-        if "case_threshold" in self.policy_data.keys():
-            return f"CDC-{self.policy_data['case_threshold'][-1]}"
-        else:
-            return f"Staged Alert-{self.policy_data['lockdown_thresholds'][-1]}"
-
-    def plot_tier_bar(self, tier_hist_list: list, peak_icu_demand):
-        """
-        Plots histograms of average proportion of days each tier was active.
-        :param tier_hist_list: total number of days each tier was active for each sample paths.
-        :return: the plot filename.
-        """
-        tier_hist_mean = [np.mean(tier) / (self.T_end - self.T_start) for tier in tier_hist_list]
-        fig, ax = plt.subplots()
-        ax2 = ax.twinx()  # instantiate a second axes that shares the same x-axis for peak ICU demand.
-
-        val = [i for i in range(len(self.tier_colors))]
-        col = list(self.tier_colors.values())
-        labels = [f"Stage {i+1}" for i in range(len(self.tier_colors))]
-        ax.bar(val, tier_hist_mean, color=col, label=labels)
-        ax2.bar(len(self.tier_colors), peak_icu_demand, color="gray", label="Peak ICU")
-        ax.set_ylabel("Proportion of days")
-        ax.set_ylim(0, 1)
-        ax2.set_ylabel("Peak ICU Demand")
-        ax2.set_ylim(0, 300)
-        ax.set_xticks([])
-        lines, labels = ax.get_legend_handles_labels()
-        lines2, labels2 = ax2.get_legend_handles_labels()
-        ax2.legend(lines + lines2, labels + labels2, loc="upper left", fontsize="12")
-        plot_filename = self.path_to_report / f"bar_{self.report_data['instance_name']}_{self.trigger_summary()}_{self.stats_start_date.date()}.pdf"
-        plt.tight_layout()
-        plt.subplots_adjust(hspace=0)
-        plt.savefig(plot_filename)
-        return plot_filename

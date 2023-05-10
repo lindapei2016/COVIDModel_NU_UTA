@@ -134,7 +134,8 @@ MultiTierPolicy_IO_var_names = (
     "hosp_adm_thresholds",
     "staffed_bed_thresholds",
     "tier_history",
-    "surge_history"
+    "surge_history",
+    "active_indicator_history"
 )
 
 plot_var_names = ["ICU_history",
@@ -272,10 +273,10 @@ def load_vars_from_dict(simulation_object, loaded_dict, keys_to_convert_to_array
 def export_rep_to_json(
         sim_rep,
         sim_rep_filename,
-        vaccine_group_v0_filename,
-        vaccine_group_v1_filename,
-        vaccine_group_v2_filename,
-        vaccine_group_v3_filename,
+        vaccine_group_v0_filename=None,
+        vaccine_group_v1_filename=None,
+        vaccine_group_v2_filename=None,
+        vaccine_group_v3_filename=None,
         multi_tier_policy_filename=None,
         random_params_filename=None,
 ):
@@ -323,22 +324,23 @@ def export_rep_to_json(
     json.dump(d, open(sim_rep_filename, "w"))
 
     # Export vaccine group variables
-    vaccine_group_filenames = [
-        vaccine_group_v0_filename,
-        vaccine_group_v1_filename,
-        vaccine_group_v2_filename,
-        vaccine_group_v3_filename,
-    ]
+    if vaccine_group_v0_filename is not None:
+        vaccine_group_filenames = [
+            vaccine_group_v0_filename,
+            vaccine_group_v1_filename,
+            vaccine_group_v2_filename,
+            vaccine_group_v3_filename,
+        ]
 
-    for i in range(len(vaccine_group_filenames)):
-        vaccine_group = sim_rep.vaccine_groups[i]
-        d = {}
-        for k in VaccineGroup_IO_var_names:
-            if k in VaccineGroup_IO_arrays_var_names:
-                d[k] = [matrix.tolist() for matrix in getattr(vaccine_group, k)]
-            else:
-                d[k] = getattr(vaccine_group, k)
-        json.dump(d, open(vaccine_group_filenames[i], "w"))
+        for i in range(len(vaccine_group_filenames)):
+            vaccine_group = sim_rep.vaccine_groups[i]
+            d = {}
+            for k in VaccineGroup_IO_var_names:
+                if k in VaccineGroup_IO_arrays_var_names:
+                    d[k] = [matrix.tolist() for matrix in getattr(vaccine_group, k)]
+                else:
+                    d[k] = getattr(vaccine_group, k)
+            json.dump(d, open(vaccine_group_filenames[i], "w"))
 
     # Export sim_rep.policy variables
     if multi_tier_policy_filename is not None:
