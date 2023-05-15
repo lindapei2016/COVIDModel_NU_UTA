@@ -33,15 +33,18 @@ class SimCalendar:
     def __init__(self, start_date, sim_length,
                  school_closure_blocks,
                  ts_transmission_reduction, ts_cocooning,
-                 holidays, long_holidays):
+                 holidays, long_holidays,
+                 real_IH_history):
         self.start = start_date
         self.calendar = [self.start + dt.timedelta(days=t) for t in range(sim_length)]
         self.calendar_ix = {d: d_ix for (d_ix, d) in enumerate(self.calendar)}
         self._is_weekday = [d.weekday() not in [5, 6] for d in self.calendar]
         self._day_type = [WEEKDAY if iw else WEEKEND for iw in self._is_weekday]
+        self.lockdown = None
         self.schools_closed = None
         self.fixed_transmission_reduction = None
         self.fixed_cocooning = None
+        self.real_hosp = real_IH_history
 
         self.load_school_closure(school_closure_blocks)
         self.load_fixed_transmission_reduction(ts_transmission_reduction)
@@ -108,6 +111,22 @@ class SimCalendar:
             if dt_hd in self.calendar:
                 self._day_type[self.calendar_ix[dt_hd]] = LONG_HOLIDAY
 
+    # output fixed transmission reduction Apr. 21, 2023, Sonny
+    def output_fixed_transmission_reduction(self, path):
+        writeCSVFile = open(path, 'w')
+        writeCSVFile.write("index,date,transmission_reduction\n")
+        for d_ix, tr in enumerate(self.fixed_transmission_reduction):
+            writeCSVFile.write("{},{},{}\n".format(d_ix, self.calendar[d_ix].strftime("%m/%d/%Y"), self.fixed_transmission_reduction[d_ix]))
+        writeCSVFile.close()
+
+    # output fixed cocooning Apr. 21, 2023, Sonny
+    def output_fixed_cocooning(self, path):
+        writeCSVFile = open(path, 'w')
+        writeCSVFile.write("index,date,cocooning\n")
+        for d_ix, tr in enumerate(self.fixed_cocooning):
+            writeCSVFile.write("{},{},{}\n".format(d_ix, self.calendar[d_ix].strftime("%m/%d/%Y"), self.fixed_transmission_reduction[d_ix]))
+        writeCSVFile.close()
+
 
 class City:
     def __init__(
@@ -124,15 +143,68 @@ class City:
             death_from_hosp_filename,
             death_from_home_filename,
             variant_prevalence_filename,
+            wastewater_filename=None, # Apr. 19, 2023, Sonny, by default, no waster data is provided
+            viral_shedding_profile_filename=None, # Apr. 19, 2023, Sonny, by default, no viral shedding profile is provided
     ):
         self.city = city
         self.path_to_data = base_path / "instances" / f"{city}"
 
-        self.config = {}
-        self.load_config(config_filename)
+        with open(str(self.path_to_data / config_filename), "r") as input_file:
+            self.config = json.load(input_file)
 
-        self.load_setup_data(setup_filename)
+        self.epi_rand = None
 
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        #  Load data from setup_filename
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        with open(str(self.path_to_data / setup_filename), "r") as input_file:
+            data = json.load(input_file)
+            assert self.city == data["city"], "Data file does not match city."
+
+            # LP note: smooth this later -- not all of these attributes
+            #   are actually used and some of them are redundant
+            for (k, v) in data.items():
+                setattr(self, k, v)
+
+
+            # Load demographics information
+            self.N = np.array(data["population"])
+            self.I0 = np.array(data["IY_ini"])
+
+            # Load simulation dates
+            self.start_date = dt.datetime.strptime(
+                data["start_date"], datetime_formater
+            )
+
+            self.end_date = dt.datetime.strptime(
+                data["end_date"], datetime_formater)
+
+            # the school_closure_period attribute is a list (of lists) indicating
+            #   historical periods of school closure
+            # each element of the list is a 2-element list,
+            #   where the 1st element corresponds to the start date of school closure
+            #   and the 2nd element corresponds to the end date of school closure
+            self.school_closure_period = []
+            for blSc in range(len(data["school_closure"])):
+                self.school_closure_period.append(
+                    [
+                        dt.datetime.strptime(
+                            data["school_closure"][blSc][0], datetime_formater
+                        ),
+                        dt.datetime.strptime(
+                            data["school_closure"][blSc][1], datetime_formater
+                        ),
+                    ]
+                )
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Set up base_epi
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        self.base_epi = EpiSetup(data["epi_params"])
+
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Load hospitalization-related data
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         hosp_related_data_filenames = (hospitalization_filename,
                                        hosp_icu_filename,
                                        hosp_admission_filename,
@@ -145,8 +217,13 @@ class City:
                                                "real_ToICUD_history",
                                                "real_ToIYD_history")
 
-        self.load_hosp_related_data(hosp_related_data_filenames,
-                                    real_history_hosp_related_data_vars)
+        for i in range(len(hosp_related_data_filenames)):
+            filename = hosp_related_data_filenames[i]
+            var = real_history_hosp_related_data_vars[i]
+            if filename is not None:
+                setattr(self, var, self.read_hosp_related_data(filename))
+            else:
+                setattr(self, var, None)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Load prevalence data
@@ -171,7 +248,7 @@ class City:
         self.L = len(self.N[0])
 
         # Maximum simulation length
-        self.T = 1 + (self.simulation_end_date - self.simulation_start_date).days
+        self.T = 1 + (self.end_date - self.start_date).days
 
         self.otherInfo = {}
 
@@ -190,23 +267,113 @@ class City:
 
         self.cal = self.build_calendar(transmission_filename)
 
-    def load_config(self, config_filename):
-        with open(str(self.path_to_data / config_filename), "r") as input_file:
-            self.config = json.load(input_file)
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Apr. 19, 2023, Sonny
+        # Load wastewater data and initialize viral shedding profile
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        self.fecal_load = 249 # May 10
+        self.flag_wastewater_sim = True
+        self.viral_shedding_profile = None
+        if viral_shedding_profile_filename is None:
+            self.flag_wastewater_sim = False
+        else:
+            with open(self.path_to_data / viral_shedding_profile_filename, "r") as input_file:
+                self.viral_shedding_profile = json.load(input_file)
+            if self.viral_shedding_profile["shedding_function"] == "delta":
+                self.viral_shedding_profile["shedding_function_val"] = [1.0 / self.viral_shedding_profile["num_days"]
+                                                                         for _ in range(self.viral_shedding_profile["num_days"])]
+            elif self.viral_shedding_profile["shedding_function"] == "param_phan":  # parametric model
+                self.viral_shedding_profile["shedding_function_val"] = []
+                if self.viral_shedding_profile["shedding_function_param"][0] > 0 and self.viral_shedding_profile["shedding_function_param"][1] > 1:
+                    for i in range(self.viral_shedding_profile["num_days"]):
+                        self.viral_shedding_profile["shedding_function_val"].append(0.5 * (self.viral_shedding_profile["shedding_function_param"][0] * i
+                                                                                       / (self.viral_shedding_profile["shedding_function_param"][1] *
+                                                                                          self.viral_shedding_profile["shedding_function_param"][1] + i * i)
+                                                                                       + self.viral_shedding_profile["shedding_function_param"][0] * (
+                                                                                                   i + 1) / (
+                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] *
+                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] + (i + 1) * (
+                                                                                                               i + 1))))
+            # May 10, Sonny
+            elif self.viral_shedding_profile["shedding_function"] == "param_phan_corr":
+                # average viral shedding in phan paper may be off
+                # this approach tries to fix the issue
+                self.viral_shedding_profile["shedding_function_val"] = []
+                if self.viral_shedding_profile["shedding_function_param"][0] > 0 and self.viral_shedding_profile["shedding_function_param"][1] > 1:
+                        for i in range(self.viral_shedding_profile["num_days"]):
+                            exponent = 0.5 * (self.viral_shedding_profile["shedding_function_param"][0] * i
+                                                                                       / (self.viral_shedding_profile["shedding_function_param"][1] *
+                                                                                          self.viral_shedding_profile["shedding_function_param"][1] + i * i)
+                                                                                       + self.viral_shedding_profile["shedding_function_param"][0] * (
+                                                                                                   i + 1) / (
+                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] *
+                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] + (i + 1) * (
+                                                                                                               i + 1)))
+                            self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 10 ** exponent)
+            #elif self.viral_shedding_profile["shedding_function"] == "step":
+            #    self.viral_shedding_profile["shedding_function_val"] = [0 for _ in range(self.viral_shedding_profile["num_days"])]
 
-    def load_hosp_related_data(self, hosp_related_data_filenames,
-                               real_history_hosp_related_data_vars):
+        # read wastewater data
+        self.real_wastewater_viral_load = None
+        if wastewater_filename is not None:
+            self.real_wastewater_viral_load = self.read_wastewater_data(wastewater_filename)
+        # End: Load wastewater data and initialize viral shedding profile
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-        for i in range(len(hosp_related_data_filenames)):
-            filename = hosp_related_data_filenames[i]
-            var = real_history_hosp_related_data_vars[i]
-            setattr(self, var, self.read_hosp_file(filename))
+    # load fixed viral shedding profile, this will automatically activate wastewater simulation
+    # Apr. 19, 2023, Sonny
+    def load_fixed_viral_shedding_profile(self, shedding_function_val):
+        if self.flag_wastewater_sim is False:
+            self.flag_wastewater_sim = True
+        if self.viral_shedding_profile is None:
+            self.viral_shedding_profile = {"shedding_function": "manual"}
+        self.viral_shedding_profile["shedding_function_val"] = []
+        if self.viral_shedding_profile["shedding_function"] == "param_phan": # parametric model
+            for i in range(self.viral_shedding_profile["num_days"]):
+                self.viral_shedding_profile["shedding_function_val"].append(0.5 * (shedding_function_val[0] * i
+                          / (shedding_function_val[1] * shedding_function_val[1] + i * i)
+                          + shedding_function_val[0] * (i + 1) / (shedding_function_val[1] * shedding_function_val[1] + (i + 1) * (i + 1))))
+        elif self.viral_shedding_profile["shedding_function"] == "param_phan_corr": # May 10, Sonny
+            for i in range(self.viral_shedding_profile["num_days"]):
+                exponent = 0.5 * (shedding_function_val[0] * i
+                       / (shedding_function_val[1] * shedding_function_val[1] + i * i)
+                       + shedding_function_val[0] * (i + 1) / (
+                                   shedding_function_val[1] * shedding_function_val[1] + (i + 1) * (i + 1)))
+                self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 10 ** exponent)
+        else:
+            for _idx in range(len(shedding_function_val)):
+                self.viral_shedding_profile["shedding_function_val"].append(shedding_function_val[_idx])
 
-    def read_hosp_file(self, hosp_filename):
-        """
+    # Apr. 19, 2023, Sonny, read wastewater data
+    def read_wastewater_data(self, wastewater_filename):
+        '''
+        Similar to the usage of read_hosp_related_data()
+        :param wastewater_filename:
+        :return:
+        '''
+        df_wastewater = pd.read_csv(
+            str(self.path_to_data / wastewater_filename),
+            parse_dates=["date"],
+            date_parser=pd.to_datetime,
+        )
+
+        df_wastewater = df_wastewater[df_wastewater["date"] <= self.end_date]
+
+        # if wastewater data starts before self.start_date
+        if df_wastewater["date"][0] <= self.start_date:
+            df_wastewater = df_wastewater[df_wastewater["date"] >= self.start_date]
+            df_wastewater = list(df_wastewater["viral_load"]) # convert the column of the viral load into a list
+        else:
+            df_wastewater = [0] * (df_wastewater["date"][0] - self.start_date).days + list(
+                df_wastewater["viral_load"]) # set the entries between start_date and the first date of the data
+                    # to be 0
+        return df_wastewater
+
+    def read_hosp_related_data(self, hosp_filename):
+        '''
         Helper function to read a hospitalization data file
             and return an array with hospitalization counts.
-        """
+        '''
 
         df_hosp = pd.read_csv(
             str(self.path_to_data / hosp_filename),
@@ -214,102 +381,56 @@ class City:
             date_parser=pd.to_datetime,
         )
 
-        df_hosp = df_hosp[df_hosp["date"] <= self.simulation_end_date]
+        df_hosp = df_hosp[df_hosp["date"] <= self.end_date]
 
-        # if hospitalization data starts before self.simulation_start_date
-        if df_hosp["date"][0] <= self.simulation_start_date:
-            df_hosp = df_hosp[df_hosp["date"] >= self.simulation_start_date]
-            df_hosp = list(df_hosp["hospitalized"])
+        # if hospitalization data starts before self.start_date
+        if df_hosp["date"][0] <= self.start_date:
+            df_hosp = df_hosp[df_hosp["date"] >= self.start_date]
+            df_hosp = list(df_hosp["hospitalized"]) # Sonny's notes; convert data frame to list
         else:
-            df_hosp = [0] * (df_hosp["date"][0] - self.simulation_start_date).days + list(
+            df_hosp = [0] * (df_hosp["date"][0] - self.start_date).days + list(
                 df_hosp["hospitalized"]
             )
         return df_hosp
-
-    def load_setup_data(self, setup_filename):
-        with open(str(self.path_to_data / setup_filename), "r") as input_file:
-            data = json.load(input_file)
-            assert self.city == data["city"], "Data file does not match city."
-
-            # LP note: smooth this later -- not all of these attributes
-            #   are actually used and some of them are redundant
-            for (k, v) in data.items():
-                setattr(self, k, v)
-
-            # Load demographics information
-            self.N = np.array(data["population"])
-            self.I0 = np.array(data["IY_ini"])
-
-            # Load simulation dates
-            self.simulation_start_date = dt.datetime.strptime(
-                data["simulation_start_date"], datetime_formater
-            )
-
-            self.simulation_end_date = dt.datetime.strptime(
-                data["simulation_end_date"], datetime_formater)
-
-            # the school_closure_period attribute is a list (of lists) indicating
-            #   historical periods of school closure
-            # each element of the list is a 2-element list,
-            #   where the 1st element corresponds to the start date of school closure
-            #   and the 2nd element corresponds to the end date of school closure
-            self.school_closure_period = []
-            for blSc in range(len(data["school_closure"])):
-                self.school_closure_period.append(
-                    [
-                        dt.datetime.strptime(
-                            data["school_closure"][blSc][0], datetime_formater
-                        ),
-                        dt.datetime.strptime(
-                            data["school_closure"][blSc][1], datetime_formater
-                        ),
-                    ]
-                )
-
-            self.epi_rand = None
-            self.base_epi = EpiSetup(data["epi_params"])
 
     def build_calendar(self, transmission_filename):
         """
         Compute couple parameters (i.e., parameters that depend on the input)
         and build the simulation calendar.
         """
-        df_transmission = pd.read_csv(
-            str(self.path_to_data / transmission_filename),
-            parse_dates=["date"],
-            date_parser=pd.to_datetime,
-            float_precision="round_trip",
-        )
-        transmission_reduction = [
-            (d, tr)
-            for (d, tr) in zip(
-                df_transmission["date"], df_transmission["transmission_reduction"]
+        try:
+            df_transmission = pd.read_csv(
+                str(self.path_to_data / transmission_filename),
+                parse_dates=["date"],
+                date_parser=pd.to_datetime,
+                float_precision="round_trip",
             )
-        ]
+            transmission_reduction = [
+                (d, tr)
+                for (d, tr) in zip(
+                    df_transmission["date"], df_transmission["transmission_reduction"]
+                )
+            ]
 
-        cocooning = [
-            (d, co)
-            for (d, co) in zip(
-                df_transmission["date"], df_transmission["cocooning"]
-            )
-        ]
+            try:
+                cocooning = [
+                    (d, co)
+                    for (d, co) in zip(
+                        df_transmission["date"], df_transmission["cocooning"]
+                    )
+                ]
+            except:
+                cocooning = [(d, 0.0) for d in df_transmission["date"]]
 
-        cal = SimCalendar(self.simulation_start_date, self.T,
+        except FileNotFoundError:
+            # Initialize empty if no file available
+            transmission_reduction = []
+
+        cal = SimCalendar(self.start_date, self.T,
                           self.school_closure_period,
                           transmission_reduction, cocooning,
-                          self.weekday_holidays, self.weekday_longholidays)
-
-        return cal
-
-    def load_other_info(self, transmission_filename):
-
-        df_transmission = pd.read_csv(
-            str(self.path_to_data / transmission_filename),
-            parse_dates=["date"],
-            date_parser=pd.to_datetime,
-            float_precision="round_trip",
-        )
-
+                          self.weekday_holidays, self.weekday_longholidays,
+                          self.real_IH_history)
 
         for dfk in df_transmission.keys():
             if (
@@ -319,9 +440,10 @@ class City:
             ):
                 self.otherInfo[dfk] = {}
                 for (d, dfv) in zip(df_transmission["date"], df_transmission[dfk]):
-                    if d in self.cal.calendar_ix:
-                        d_ix = self.cal.calendar_ix[d]
+                    if d in cal.calendar_ix:
+                        d_ix = cal.calendar_ix[d]
                         self.otherInfo[dfk][d_ix] = dfv
+        return cal
 
 
 class TierInfo:
@@ -701,19 +823,40 @@ class EpiSetup:
 
         # See Yang et al. (2021) and Arslan et al. (2021)
 
+        # tau: proportion of exposed individuals who become symptomatic
+        # mu_ICU: rate from ICU to death (for each age group)
+
+        # IFR: infected fatality ratio (%)
+
         self.beta = self.beta0  # Unmitigated transmission rate
         self.YFR = self.IFR / self.tau  # symptomatic fatality ratio (%)
-        self.pIH0 = self.pIH  # percent of patients going directly to general ward
+        self.pIH0 = self.pIH
         self.YHR0 = self.YHR  # % of symptomatic infections that go to hospital
         self.YHR_overall0 = self.YHR_overall
 
         # if gamma_IH and mu are lists, reshape them for right dimension
-        self.gamma_IH0 = self.gamma_IH0.reshape(self.gamma_IH0.size, 1)
-        self.etaICU = self.etaICU.reshape(self.etaICU.size, 1)
-        self.etaICU0 = self.etaICU.copy()
-        self.gamma_ICU0 = self.gamma_ICU0.reshape(self.gamma_ICU0.size, 1)
-        self.mu_ICU0 = self.mu_ICU0.reshape(self.mu_ICU0.size, 1)
-        self.HICUR0 = self.HICUR
+        if isinstance(self.gamma_IH, np.ndarray):
+            self.gamma_IH = self.gamma_IH.reshape(self.gamma_IH.size, 1)
+            self.gamma_IH0 = self.gamma_IH.copy()
+        if isinstance(self.etaICU, np.ndarray):
+            self.etaICU = self.etaICU.reshape(self.etaICU.size, 1)
+            self.etaICU0 = self.etaICU.copy()
+        if isinstance(self.gamma_ICU, np.ndarray):
+            self.gamma_ICU = self.gamma_ICU.reshape(self.gamma_ICU.size, 1)
+            self.gamma_ICU0 = self.gamma_ICU.copy()
+        if isinstance(self.mu_ICU, np.ndarray):
+            self.mu_ICU = self.mu_ICU.reshape(self.mu_ICU.size, 1)
+            self.mu_ICU0 = self.mu_ICU.copy()
+
+        self.update_YHR_params()
+        self.update_nu_params()
+
+        # Formerly updated under update_hosp_duration() function in original code
+        # See Yang et al. (2021) pg. 9 -- add constant parameters (alphas)
+        #   to better estimate durations in ICU and general ward.
+        self.gamma_ICU = self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
+        self.gamma_IH = self.gamma_IH0 * (1 - self.alpha_IH)
+        self.mu_ICU = self.mu_ICU0 * (1 + self.alpha_mu_ICU)
 
     def variant_update_param(self, new_params):
         """
@@ -725,29 +868,20 @@ class EpiSetup:
                 setattr(self, k, v)
             else:
                 setattr(self, k, v * getattr(self, k))
-
-    @property
-    def gamma_ICU(self):
-        """
-        Adjust hospital dynamics according to real data with self.alpha_ params.
-        See Haoxiang et al. or Arslan et al. for more detail.
-        This one increase the rate of recovering from ICU.
-        """
-        return self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
-
-    @property
-    def gamma_IH(self):
-        """ This one decrease the rate of recovering from IH."""
-        return self.gamma_IH0 * (1 - self.alpha_IH)
-
-    @property
-    def mu_ICU(self):
-        """ This one increase the rate of death from ICU. """
-        return self.mu_ICU0 * (1 + self.alpha_mu_ICU)
+        self.update_YHR_params()
+        self.update_nu_params()
+        self.gamma_ICU = self.gamma_ICU0 * (1 + self.alpha_gamma_ICU)
+        self.gamma_IH = self.gamma_IH0 * (1 - self.alpha_IH)
+        self.mu_ICU = self.mu_ICU0 * (1 + self.alpha_mu_ICU)
 
     def update_icu_params(self, rdrate):
         # update the ICU admission parameter HICUR and update nu
         self.HICUR = self.HICUR * rdrate
+        self.nu = (
+                self.gamma_IH
+                * self.HICUR
+                / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
+        )
         self.pIH = 1 - (1 - self.pIH) * rdrate
 
     def update_icu_all(self, t, otherInfo):
@@ -766,11 +900,16 @@ class EpiSetup:
                 self.etaICU = self.etaICU0.copy() / otherInfo["etaICU"][t]
             else:
                 self.etaICU = self.etaICU0.copy()
+        self.nu = (
+                self.gamma_IH
+                * self.HICUR
+                / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
+        )
 
-    @property
-    def omega_P(self):
-        """ infectiousness of pre-symptomatic relative to symptomatic """
-        return np.array(
+    def update_YHR_params(self):
+        # Arslan et al. (2021) pg. 7
+        # omega_P: infectiousness of pre-symptomatic relative to symptomatic
+        self.omega_P = np.array(
             [
                 (
                         self.tau
@@ -781,27 +920,18 @@ class EpiSetup:
                         )
                         + (1 - self.tau) * self.omega_IA / self.gamma_IA
                 )
-                / (self.tau * self.omega_IY / self.rho_Y + (1 - self.tau) * self.omega_IA / self.rho_A)
+                / (self.tau * self.omega_IY + (1 - self.tau) * self.omega_IA)
+                * self.rho_Y
                 * self.pp
                 / (1 - self.pp)
                 for a in range(len(self.YHR_overall))
             ]
         )
+        self.omega_PA = self.omega_IA * self.omega_P
+        self.omega_PY = self.omega_IY * self.omega_P
 
-    @property
-    def omega_PA(self):
-        """ infectiousness of pre-asymptomatic individuals relative to IA for age-risk group a, r """
-        return self.omega_IA * self.omega_P
-
-    @property
-    def omega_PY(self):
-        """ infectiousness of pre-symptomatic individuals relative to IY for age-risk group a, r"""
-        return self.omega_IY * self.omega_P
-
-    @property
-    def pi(self):
-        """ rate-adjusted proportion of symptomatic individuals who go to the hospital for age-risk group a, r """
-        return np.array(
+        # pi is computed using risk based hosp rate
+        self.pi = np.array(
             [
                 self.YHR[a]
                 * self.gamma_IY
@@ -810,19 +940,28 @@ class EpiSetup:
             ]
         )
 
-    @property
-    def nu(self):
-        """ rate-adjusted proportion of general ward patients transferred to ICU for age group a """
-        return self.gamma_IH * self.HICUR / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
+        # symptomatic fatality ratio divided by symptomatic hospitalization rate
+        self.HFR = self.YFR / self.YHR
 
-    @property
-    def HFR(self):
-        """ symptomatic fatality ratio divided by symptomatic hospitalization rate """
-        return self.YFR / self.YHR
-
-    @property
-    def nu_ICU(self):
-        return self.gamma_ICU0 * self.ICUFR / (self.mu_ICU0 + (self.gamma_ICU0 - self.mu_ICU0) * self.ICUFR)
+    def update_nu_params(self):
+        try:
+            self.HICUR0 = self.HICUR
+            self.nu = (
+                    self.gamma_IH
+                    * self.HICUR
+                    / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HICUR)
+            )
+            self.nu_ICU = (
+                    self.gamma_ICU
+                    * self.ICUFR
+                    / (self.mu_ICU + (self.gamma_ICU - self.mu_ICU) * self.ICUFR)
+            )
+        except:
+            self.nu = (
+                    self.gamma_IH
+                    * self.HFR
+                    / (self.etaICU + (self.gamma_IH - self.etaICU) * self.HFR)
+            )
 
     def effective_phi(self, school, cocooning, social_distance, demographics, day_type):
         """

@@ -69,7 +69,9 @@ class SimReplication:
                              "ToIYD",
                              "ToRS",
                              "ToSS",
-                             "S")
+                             "S",
+                             "SE" # Apr. 19, 2023, Sonny, track flow from S to E
+                             )
 
         # Keep track of the total number of immune evasion:
         self.ToRS_immune = []  # waned natural immunity
@@ -95,8 +97,15 @@ class SimReplication:
             "ToIA",
             "ToIY",
             "ToRS",
-            "ToSS"
-        )
+            "ToSS",
+            "SE" # Apr. 19, 2023, Sonny, add tracking variable to track number of people exposed
+        ) # note that both VaccineGroup and SimReplication define tracking_vars and state_vars,
+        # these may cause conflict if they are inconsistent in two objects
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Apr. 19, 2023, Sonny, tracking wastewater signal
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        self.wastewater_viral_load = []
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def init_rng(self):
         """
@@ -333,10 +342,10 @@ class SimReplication:
                     #   already have total_imbalance assertion later --
                     #   might want to uncomment or consider making this a toggle
                     #   for debugging purposes
-                    assert (getattr(v_group, attribute) > -1e-2).all(), \
-                        f"fPop negative value of {getattr(v_group, attribute)} " \
-                        f"on compartment {v_group.v_name}.{attribute} at time " \
-                        f"{self.instance.cal.calendar[t]}, {t}"
+                    # assert (getattr(v_group, attribute) > -1e-2).all(), \
+                    #     f"fPop negative value of {getattr(v_group, attribute)} " \
+                    #     f"on compartment {v_group.v_name}.{attribute} at time " \
+                    #     f"{self.instance.cal.calendar[t]}, {t}"
 
                 setattr(self, attribute, sum_across_vaccine_groups)
 
@@ -344,6 +353,19 @@ class SimReplication:
             #   certain variables -- save these current values
             for attribute in self.history_vars:
                 getattr(self, f"{attribute}_history").append(getattr(self, attribute))
+
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            # Apr. 19, 2023, Sonny, simulating wastewater signal
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+            if self.instance.flag_wastewater_sim is True:
+                _w = 0
+                for i in range(self.instance.viral_shedding_profile['num_days']):
+                    if t - i >= time_start:
+                        _w += np.sum(self.instance.viral_shedding_profile["shedding_function_val"][i]
+                                     * self.SE_history[t - i])
+                self.wastewater_viral_load.append(_w)
+
+            # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # LP note -- might want to comment if not debugging and
             #   want speedier simulation
@@ -446,15 +468,14 @@ class SimReplication:
         get_binomial_transition_quantity = self.get_binomial_transition_quantity
 
         rate_E = discrete_approx(epi.sigma_E, step_size)
-        nu_ICU = epi.nu_ICU
-        nu = epi.nu
+
         rate_IAR = discrete_approx(np.full((A, L), epi.gamma_IA), step_size)
         rate_PAIA = discrete_approx(np.full((A, L), epi.rho_A), step_size)
         rate_PYIY = discrete_approx(np.full((A, L), epi.rho_Y), step_size)
-        rate_IHICU = discrete_approx(nu * epi.etaICU, step_size)
-        rate_IHR = discrete_approx((1 - nu) * epi.gamma_IH, step_size)
-        rate_ICUD = discrete_approx(nu_ICU * epi.mu_ICU, step_size)
-        rate_ICUR = discrete_approx((1 - nu_ICU) * epi.gamma_ICU, step_size)
+        rate_IHICU = discrete_approx(epi.nu * epi.etaICU, step_size)
+        rate_IHR = discrete_approx((1 - epi.nu) * epi.gamma_IH, step_size)
+        rate_ICUD = discrete_approx(epi.nu_ICU * epi.mu_ICU, step_size)
+        rate_ICUR = discrete_approx((1 - epi.nu_ICU) * epi.gamma_ICU, step_size)
         rate_immune = discrete_approx(immune_evasion, step_size)
 
         for _t in range(step_size):
@@ -484,7 +505,7 @@ class SimReplication:
                     # If there is immune evasion, there will be two outgoing arc from S_vax. Infected people will
                     # move to E compartment. People with waned immunity will go the S_waned compartment.
                     # _dS: total rate for leaving S compartment.
-                    # _dSE: adjusted rate for entering E compartment.
+                    # _dSE: adjusted rate for entering E compartment. Sonny note: "used for wastewater"
                     # _dSR: adjusted rate for entering S_waned (self.vaccine_groups[3]._S) compartment.
                     _dSE = get_binomial_transition_quantity(
                         v_groups._S[_t],
@@ -495,6 +516,11 @@ class SimReplication:
 
                     E_out = get_binomial_transition_quantity(v_groups._E[_t], rate_E)
                     v_groups._E[_t + 1] = v_groups._E[_t] + _dSE - E_out
+
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    # Apr. 19, 2023, Sonny, track SE
+                    v_groups._SE[_t] = _dSE
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
                     self.vaccine_groups[3]._S[_t + 1] = (
                             self.vaccine_groups[3]._S[_t + 1] + _dSR
@@ -507,6 +533,11 @@ class SimReplication:
                     # Dynamics for E
                     E_out = get_binomial_transition_quantity(v_groups._E[_t], rate_E)
                     v_groups._E[_t + 1] = v_groups._E[_t] + _dS - E_out
+
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+                    # Apr. 19, 2023, Sonny, track SE
+                    v_groups._SE[_t] = _dS
+                    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
                     v_groups._ToSS[_t] = 0
 
@@ -631,18 +662,18 @@ class SimReplication:
                 setattr(
                     v_groups,
                     attribute,
-                    getattr(v_groups, "_" + attribute)[step_size].copy(),
-                )
+                    getattr(v_groups, "_" + attribute)[step_size].copy(), # Sonny's note, deep copy value at last
+                ) # time step
 
             for attribute in self.tracking_vars:
                 setattr(
-                    v_groups, attribute, getattr(v_groups, "_" + attribute).sum(axis=0)
-                )
-
+                    v_groups, attribute, getattr(v_groups, "_" + attribute).sum(axis=0) # Sonny's note, deep copy
+                ) # tracking variables, since tracking variables track the flow among compartments, so we take
+                    # the sum
         if t >= self.vaccine.vaccine_start_time:
             self.vaccine_schedule(t, rate_immune)
 
-        for v_groups in self.vaccine_groups:
+        for v_groups in self.vaccine_groups: # Sonny's note, refresh and update v_group
 
             for attribute in self.state_vars:
                 setattr(v_groups, "_" + attribute, np.zeros((step_size + 1, A, L)))
@@ -794,6 +825,11 @@ class SimReplication:
         for attribute in self.history_vars:
             setattr(self, f"{attribute}_history", [])
 
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+        # Apr. 19, 2023, Sonny, reset viral load
+        self.wastewater_viral_load = []
+        # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
         self.next_t = 0
 
     def get_binomial_transition_quantity(self, n, p):
@@ -819,3 +855,64 @@ class SimReplication:
             return n * p
         else:
             return self.rng.binomial(np.round(n).astype(int), p)
+
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    # Apr. 19, 2023, Sonny, Output Viral Load
+    # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    def output_viral_load(self, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,viral_load\n")
+        for idx, viral_load in enumerate(self.wastewater_viral_load):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(viral_load))
+        writeFile.close()
+
+
+    def output_IH_history(self, num_days, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,hospitalized\n")
+        for idx in range(num_days):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(np.sum(self.IH_history[idx])))
+        writeFile.close()
+
+
+    def output_hospital_history_var(self, history_var, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,hospitalized\n")
+        sample_path = np.array(getattr(self, f"{history_var}_history"))
+        sample_path = np.sum(sample_path, axis=(1,2))
+        for idx in range(len(sample_path)):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(sample_path[idx]))
+        writeFile.close()
+
+
+    def output_SE_hisory(self, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,exposed\n")
+        sample_path = np.array(self.SE_history)
+        sample_path = np.sum(sample_path, axis=(1,2))
+        for idx in range(len(sample_path)):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(sample_path[idx]))
+        writeFile.close()
+
+
+    def output_IHICU_history(self, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,hospitalized\n")
+        IH = np.array(self.IH_history)
+        ICU = np.array(self.ICU_history)
+        IH = np.sum(IH, axis=(1,2))
+        ICU = np.sum(ICU, axis=(1,2))
+        IHICU = IH + ICU
+        for idx in range(len(IHICU)):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(IHICU[idx]))
+        writeFile.close()

@@ -63,7 +63,7 @@ class ParameterFitting:
 
         self.rep = SimReplication(city, vaccines, None, -1)
 
-    def run_fit(self):
+    def run_fit(self, path=None, csv_viral_shedding_path=None, csv_transmission_reduction_path=None): # add path option for outputting the solution
         """
         Function that runs the parameter fitting.
         """
@@ -71,9 +71,19 @@ class ParameterFitting:
         x_variables = res.x
         print("SSE:", res.cost)
         solution = {}
+        rel_idx = 0  # Apr. 19, 2023, Sonny, for tracking the index of x variables
+        writeSol = None
+        write_viral_shedding = None
+        write_transmission_reduction = None
+        if path is not None:
+            writeSol = open(path, 'w')
+        if csv_viral_shedding_path is not None:
+            write_viral_shedding = open(csv_viral_shedding_path, 'w')
+        if csv_transmission_reduction_path is not None:
+            write_transmission_reduction = open(csv_transmission_reduction_path, 'w')
         for idx, var in enumerate(self.variables):
             if var == "transmission_reduction":
-                tr_reduc, cocoon_reduc = self.create_transmission_reduction(x_variables[idx:])
+                tr_reduc, cocoon_reduc = self.create_transmission_reduction(x_variables[rel_idx:])
                 df_transmission = self.extend_transmission_reduction(tr_reduc, cocoon_reduc)
                 # save them into a csv file:
                 file_path = self.city.path_to_data / "transmission_lsq_estimated_data.csv"
@@ -91,9 +101,52 @@ class ParameterFitting:
                 )
                 solution[var] = tr_reduc
                 print(table)
+                if path is not None:
+                    for index, date in enumerate(self.change_dates[:-1]):
+                        writeSol.write("start_date: {}, ".format(date.strftime("%m/%d/%Y")))
+                        writeSol.write("end_date: {}, ".format(end_date[index]))
+                        writeSol.write("transmission_reduction: {}, ".format(tr_reduc[index]))
+                        writeSol.write("cocoon: {}\n".format(cocoon_reduc[index]))
+                if csv_transmission_reduction_path is not None:
+                    write_transmission_reduction.write("start_date,end_date,transmission_reduction,cocoon\n")
+                    for index, date in enumerate(self.change_dates[:-1]):
+                        write_transmission_reduction.write("{},".format(date.strftime("%m/%d/%Y")))
+                        write_transmission_reduction.write("{},".format(end_date[index]))
+                        write_transmission_reduction.write("{},".format(tr_reduc[index]))
+                        write_transmission_reduction.write("{}\n".format(cocoon_reduc[index]))
+            elif var == "viral_shedding_profile":
+                num_shedding_days = self.city.viral_shedding_profile["num_days"]
+                if self.city.viral_shedding_profile["shedding_function"] == "param_phan":
+                    viral_shedding_profile = x_variables[idx:(idx + 2)]
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                elif self.city.viral_shedding_profile["shedding_function"] == "param_phan_corr": # May 10
+                    viral_shedding_profile = x_variables[idx:(idx + 2)]
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                else:
+                    viral_shedding_profile = x_variables[idx:(idx + num_shedding_days)]
+                    rel_idx += num_shedding_days  # Apr. 19, 2023, Sonny, for tracking the index of x variables
+                #
+                writeSol.write(
+                    "Viral Shedding Function: {}\n".format(self.city.viral_shedding_profile["shedding_function"]))
+                for index, val in enumerate(viral_shedding_profile):
+                    print("Viral Shedding Profile [{}]: {}".format(index, val))
+                    if path is not None:
+                        writeSol.write("Viral Shedding Profile [{}]: {}\n".format(index, val))
+                    if csv_viral_shedding_path is not None:
+                        write_viral_shedding.write("{}\n".format(val))
+                solution[var] = viral_shedding_profile.tolist()
             else:
                 print(f"{var} = {x_variables[idx]}")
                 solution[var] = x_variables[idx]
+                if path is not None:
+                    writeSol.write(f"{var} = {x_variables[idx]}\n")
+
+        if path is not None:
+            writeSol.close()
+        if csv_viral_shedding_path is not None:
+            write_viral_shedding.close()
+        if csv_transmission_reduction_path is not None:
+            write_transmission_reduction.close()
 
         with open(self.city.path_to_data / 'lsq_data.json', 'w') as f:
             json.dump(solution, f)
@@ -112,13 +165,17 @@ class ParameterFitting:
         )
         return result
 
-    def residual_error(self, x_variables):
+    # Sonny's notes: the data stream looks like: |other variables |viral shedding profile |transmission reduction |
+    def residual_error(self, x_variables): # Sonny's notes: explain how to group variables?
         print("new value: ", x_variables)
+        rel_idx = 0 # Apr. 19, 2023, Sonny, for tracking the index of x variables
         for idx, var in enumerate(self.variables):
             if hasattr(self.city.base_epi, var):
                 setattr(self.city.base_epi, var, x_variables[idx])
+                rel_idx += 1 # Apr. 19, 2023, Sonny, for tracking the index of x variables
             elif var == "transmission_reduction":
-                tr_reduc, cocoon_reduc = self.create_transmission_reduction(x_variables[idx:])
+                # Apr. 19, 2023, Sonny, rel_idx is for tracking the index of x variables
+                tr_reduc, cocoon_reduc = self.create_transmission_reduction(x_variables[rel_idx:])
                 df_transmission = self.extend_transmission_reduction(tr_reduc, cocoon_reduc)
                 transmission_reduction = [
                     (d, tr)
@@ -132,12 +189,28 @@ class ParameterFitting:
                 ]
                 self.city.cal.load_fixed_cocooning(cocooning)
             elif var.split()[0] in variant_list:
+                rel_idx += 1  # Apr. 19, 2023, Sonny, for tracking the index of x variables
                 if var.split()[1] in {"start_date", "end_date", "peak_date"}:
                     self.city.variant_pool.variants_data['epi_params']["immune_evasion"][var.split()[0]][
                         var.split()[1]] = self.city.variant_start + dt.timedelta(days=int(x_variables[idx]))
                 else:
                     self.city.variant_pool.variants_data['epi_params'][var.split()[1]][var.split()[0]] = x_variables[idx]
-
+            elif var == "viral_shedding_profile": # Apr. 19, 2023, Sonny, include viral shedding profile variable
+                if self.city.viral_shedding_profile["shedding_function"] == "param_phan":
+                    viral_shedding_profile = x_variables[idx:(idx + 2)]
+                    self.city.load_fixed_viral_shedding_profile(viral_shedding_profile)
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                elif self.city.viral_shedding_profile["shedding_function"] == "param_phan_corr": # May 10, Sonny
+                    viral_shedding_profile = x_variables[idx:(idx + 2)]
+                    self.city.load_fixed_viral_shedding_profile(viral_shedding_profile)
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                else:
+                    num_shedding_days = self.city.viral_shedding_profile["num_days"]
+                    # print("Debug num_shedding_days: {}".format(num_shedding_days))
+                    viral_shedding_profile = x_variables[idx:(idx + num_shedding_days)]
+                    self.city.load_fixed_viral_shedding_profile(viral_shedding_profile)
+                    # print(self.city.viral_shedding_profile["shedding_function_val"])
+                    rel_idx += num_shedding_days  # Apr. 19, 2023, Sonny, for tracking the index of x variables
         # Simulate the system with the new variables:
         self.rep.simulate_time_period(self.time_frame[1], self.time_frame[1])
 
@@ -145,8 +218,14 @@ class ParameterFitting:
         # Calculate the residual error:
         for key, var in self.objective_weights.items():
             real_data = getattr(self.city, f"real_{key}")[self.time_frame[0]: self.time_frame[1] + 1]
-            sim_data = np.sum(np.array(getattr(self.rep, key)), axis=(1, 2))[self.time_frame[0]: self.time_frame[1] + 1]
+            if key == "wastewater_viral_load":
+                sim_data = getattr(self.rep, key)[self.time_frame[0]: self.time_frame[1] + 1]
+            else:
+                sim_data = np.sum(np.array(getattr(self.rep, key)), axis=(1, 2))[self.time_frame[0]: self.time_frame[1] + 1]
             error = [var * (a_i - b_i) for a_i, b_i in zip(real_data, sim_data)]
+            #if key == "wastewater_viral_load":
+            #    print("wastewater_viral_load error:")
+            #    print(error)
             residual_error.extend(error)
 
         self.rep.reset()
