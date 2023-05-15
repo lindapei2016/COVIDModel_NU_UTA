@@ -1,0 +1,6 @@
+{
+  "num_days": 30,
+  "shedding_function": "param_phan_corr",
+  "shedding_function_val": [],
+  "shedding_function_param": [71.97,4]
+}
