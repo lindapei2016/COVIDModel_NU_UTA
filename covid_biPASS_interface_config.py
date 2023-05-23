@@ -88,8 +88,6 @@ def simulation_model(system_id, worker_bit_generator, rep_number):
     #   on the randomly sampled parameters loaded from the corresponding
     #   .json file.
 
-    # breakpoint()
-
     common_rep = preloaded.reps_dict[rep_number]
 
     rep = copy.deepcopy(common_rep)
@@ -151,29 +149,3 @@ output_mode = "profile"
 max_total_reps = np.full(total_num, len(filename_prefixes))
 
 base_bit_generator_seed = 1000
-
-##################################################################################
-
-# worker_bit_generator = np.random.MT19937(1000)
-#
-# print(len(policies))
-#
-# print(policies[150])
-#
-# breakpoint()
-#
-# print(simulation_model(150, worker_bit_generator, 0))
-#
-# breakpoint()
-#
-# print(simulation_model(0, worker_bit_generator, 0))
-# print(simulation_model(100, worker_bit_generator, 0))
-# print(simulation_model(150, worker_bit_generator, 0))
-# print(simulation_model(1000, worker_bit_generator, 0))
-# print(simulation_model(1900, worker_bit_generator, 0))
-
-# print(simulation_model(70, worker_bit_generator, 0))
-#
-# print(simulation_model(1, worker_bit_generator, 0))
-# print(simulation_model(2, worker_bit_generator, 0))
-# print(simulation_model(200, worker_bit_generator, 0))
