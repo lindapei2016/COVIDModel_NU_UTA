@@ -10,6 +10,7 @@ from scipy.optimize import least_squares
 import datetime as dt
 import pandas as pd
 import json
+import time
 
 variant_list = ["delta", "omicron"]
 
@@ -67,6 +68,8 @@ class ParameterFitting:
         """
         Function that runs the parameter fitting.
         """
+        # add time stamps for computing time elapsed
+        start = time.time()
         res = self.least_squares_fit()
         x_variables = res.x
         print("SSE:", res.cost)
@@ -122,6 +125,9 @@ class ParameterFitting:
                 elif self.city.viral_shedding_profile["shedding_function"] == "param_phan_corr": # May 10
                     viral_shedding_profile = x_variables[idx:(idx + 2)]
                     rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                elif self.city.viral_shedding_profile["shedding_function"] == "param_beta": # May 17
+                    viral_shedding_profile = x_variables[idx:(idx + 3)]
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
                 else:
                     viral_shedding_profile = x_variables[idx:(idx + num_shedding_days)]
                     rel_idx += num_shedding_days  # Apr. 19, 2023, Sonny, for tracking the index of x variables
@@ -141,6 +147,11 @@ class ParameterFitting:
                 if path is not None:
                     writeSol.write(f"{var} = {x_variables[idx]}\n")
 
+        end = time.time()
+        # May 22, 2023 Sonny
+        if "log_wastewater_viral_load" in self.objective_weights.keys():
+            writeSol.write("Note: Log viral load is used for computing least squares.\n")
+        writeSol.write("Time elapsed(s): {}\n".format(end - start))
         if path is not None:
             writeSol.close()
         if csv_viral_shedding_path is not None:
@@ -204,6 +215,10 @@ class ParameterFitting:
                     viral_shedding_profile = x_variables[idx:(idx + 2)]
                     self.city.load_fixed_viral_shedding_profile(viral_shedding_profile)
                     rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
+                elif self.city.viral_shedding_profile["shedding_function"] == "param_beta": # May 10, Sonny
+                    viral_shedding_profile = x_variables[idx:(idx + 3)]
+                    self.city.load_fixed_viral_shedding_profile(viral_shedding_profile)
+                    rel_idx += len(self.city.viral_shedding_profile["shedding_function_param"])
                 else:
                     num_shedding_days = self.city.viral_shedding_profile["num_days"]
                     # print("Debug num_shedding_days: {}".format(num_shedding_days))
@@ -219,6 +234,8 @@ class ParameterFitting:
         for key, var in self.objective_weights.items():
             real_data = getattr(self.city, f"real_{key}")[self.time_frame[0]: self.time_frame[1] + 1]
             if key == "wastewater_viral_load":
+                sim_data = getattr(self.rep, key)[self.time_frame[0]: self.time_frame[1] + 1]
+            elif key == "log_wastewater_viral_load":
                 sim_data = getattr(self.rep, key)[self.time_frame[0]: self.time_frame[1] + 1]
             else:
                 sim_data = np.sum(np.array(getattr(self.rep, key)), axis=(1, 2))[self.time_frame[0]: self.time_frame[1] + 1]

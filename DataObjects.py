@@ -13,6 +13,8 @@ import datetime as dt
 from pathlib import Path
 from itertools import product
 
+from scipy.stats import beta
+
 base_path = Path(__file__).parent
 
 datetime_formater = "%Y-%m-%d %H:%M:%S"
@@ -286,7 +288,7 @@ class City:
                 self.viral_shedding_profile["shedding_function_val"] = []
                 if self.viral_shedding_profile["shedding_function_param"][0] > 0 and self.viral_shedding_profile["shedding_function_param"][1] > 1:
                     for i in range(self.viral_shedding_profile["num_days"]):
-                        self.viral_shedding_profile["shedding_function_val"].append(0.5 * (self.viral_shedding_profile["shedding_function_param"][0] * i
+                        self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 0.5 * (self.viral_shedding_profile["shedding_function_param"][0] * i
                                                                                        / (self.viral_shedding_profile["shedding_function_param"][1] *
                                                                                           self.viral_shedding_profile["shedding_function_param"][1] + i * i)
                                                                                        + self.viral_shedding_profile["shedding_function_param"][0] * (
@@ -299,25 +301,40 @@ class City:
                 # average viral shedding in phan paper may be off
                 # this approach tries to fix the issue
                 self.viral_shedding_profile["shedding_function_val"] = []
-                if self.viral_shedding_profile["shedding_function_param"][0] > 0 and self.viral_shedding_profile["shedding_function_param"][1] > 1:
+                if self.viral_shedding_profile["shedding_function_param"][0] > 0 and self.viral_shedding_profile["shedding_function_param"][1] > 0:
                         for i in range(self.viral_shedding_profile["num_days"]):
-                            exponent = 0.5 * (self.viral_shedding_profile["shedding_function_param"][0] * i
-                                                                                       / (self.viral_shedding_profile["shedding_function_param"][1] *
-                                                                                          self.viral_shedding_profile["shedding_function_param"][1] + i * i)
-                                                                                       + self.viral_shedding_profile["shedding_function_param"][0] * (
-                                                                                                   i + 1) / (
-                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] *
-                                                                                                   self.viral_shedding_profile["shedding_function_param"][1] + (i + 1) * (
-                                                                                                               i + 1)))
-                            self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 10 ** exponent)
+                            exponent1 = self.viral_shedding_profile["shedding_function_param"][0] * i / (
+                                        self.viral_shedding_profile["shedding_function_param"][1] * self.viral_shedding_profile["shedding_function_param"][1] + i * i)
+                            exponent2 = self.viral_shedding_profile["shedding_function_param"][0] * (i + 1) / (
+                                    self.viral_shedding_profile["shedding_function_param"][1] * self.viral_shedding_profile["shedding_function_param"][1] + (i + 1) * (i + 1))
+                            val1 = 10 ** exponent1
+                            val2 = 10 ** exponent2
+                            self.viral_shedding_profile["shedding_function_val"].append(
+                                self.fecal_load * (val1 + val2) / 2)
+            # May 17, beta Sonny
+            elif self.viral_shedding_profile["shedding_function"] == "param_beta":
+                self.viral_shedding_profile["shedding_function_val"] = []
+                if self.viral_shedding_profile["shedding_function_param"][2] > 0:
+                    for i in range(self.viral_shedding_profile["num_days"]):
+                        val1 = self.viral_shedding_profile["shedding_function_param"][2] * beta.pdf(
+                            i/self.viral_shedding_profile["num_days"],
+                            self.viral_shedding_profile["shedding_function_param"][0],
+                            self.viral_shedding_profile["shedding_function_param"][1])
+                        val2 = self.viral_shedding_profile["shedding_function_param"][2] * beta.pdf(
+                            (i+1) / self.viral_shedding_profile["num_days"],
+                            self.viral_shedding_profile["shedding_function_param"][0],
+                            self.viral_shedding_profile["shedding_function_param"][1])
+                        self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * (val1 + val2) / 2)
             #elif self.viral_shedding_profile["shedding_function"] == "step":
             #    self.viral_shedding_profile["shedding_function_val"] = [0 for _ in range(self.viral_shedding_profile["num_days"])]
 
         # read wastewater data
         self.real_wastewater_viral_load = None
+        self.real_log_wastewater_viral_load = None
         if wastewater_filename is not None:
             self.real_wastewater_viral_load = self.read_wastewater_data(wastewater_filename)
-        # End: Load wastewater data and initialize viral shedding profile
+            self.real_log_wastewater_viral_load = self.read_wastewarer_data_log(wastewater_filename)
+            # End: Load wastewater data and initialize viral shedding profile
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     # load fixed viral shedding profile, this will automatically activate wastewater simulation
@@ -330,16 +347,28 @@ class City:
         self.viral_shedding_profile["shedding_function_val"] = []
         if self.viral_shedding_profile["shedding_function"] == "param_phan": # parametric model
             for i in range(self.viral_shedding_profile["num_days"]):
-                self.viral_shedding_profile["shedding_function_val"].append(0.5 * (shedding_function_val[0] * i
+                self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 0.5 * (shedding_function_val[0] * i
                           / (shedding_function_val[1] * shedding_function_val[1] + i * i)
                           + shedding_function_val[0] * (i + 1) / (shedding_function_val[1] * shedding_function_val[1] + (i + 1) * (i + 1))))
         elif self.viral_shedding_profile["shedding_function"] == "param_phan_corr": # May 10, Sonny
             for i in range(self.viral_shedding_profile["num_days"]):
-                exponent = 0.5 * (shedding_function_val[0] * i
-                       / (shedding_function_val[1] * shedding_function_val[1] + i * i)
-                       + shedding_function_val[0] * (i + 1) / (
-                                   shedding_function_val[1] * shedding_function_val[1] + (i + 1) * (i + 1)))
-                self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * 10 ** exponent)
+                exponent1 = shedding_function_val[0] * i / (shedding_function_val[1] * shedding_function_val[1] + i * i)
+                exponent2 = shedding_function_val[0] * (i + 1) / (
+                                   shedding_function_val[1] * shedding_function_val[1] + (i + 1) * (i + 1))
+                val1 = 10 ** exponent1
+                val2 = 10 ** exponent2
+                self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * (val1 + val2) / 2)
+        elif self.viral_shedding_profile["shedding_function"] == "param_beta":
+            for i in range(self.viral_shedding_profile["num_days"]):
+                val1 = shedding_function_val[2] * beta.pdf(
+                    i / self.viral_shedding_profile["num_days"],
+                    shedding_function_val[0],
+                    shedding_function_val[1])
+                val2 = shedding_function_val[2] * beta.pdf(
+                    (i + 1) / self.viral_shedding_profile["num_days"],
+                    shedding_function_val[0],
+                    shedding_function_val[1])
+                self.viral_shedding_profile["shedding_function_val"].append(self.fecal_load * (val1 + val2) / 2)
         else:
             for _idx in range(len(shedding_function_val)):
                 self.viral_shedding_profile["shedding_function_val"].append(shedding_function_val[_idx])
@@ -368,6 +397,33 @@ class City:
                 df_wastewater["viral_load"]) # set the entries between start_date and the first date of the data
                     # to be 0
         return df_wastewater
+
+    def read_wastewarer_data_log(self, wastewater_filename):
+        '''
+                Similar to the usage of read_hosp_related_data()
+                :param wastewater_filename:
+                :return:
+                '''
+        df_wastewater = pd.read_csv(
+            str(self.path_to_data / wastewater_filename),
+            parse_dates=["date"],
+            date_parser=pd.to_datetime,
+        )
+
+        df_wastewater = df_wastewater[df_wastewater["date"] <= self.end_date]
+
+        # if wastewater data starts before self.start_date
+        if df_wastewater["date"][0] <= self.start_date:
+            df_wastewater = df_wastewater[df_wastewater["date"] >= self.start_date]
+            df_wastewater = list(df_wastewater["viral_load"])  # convert the column of the viral load into a list
+            df_wastewater = np.log(np.array(df_wastewater) + 1) # take natural log
+            df_wastewater = df_wastewater.tolist()
+        else:
+            df_wastewater = [0] * (df_wastewater["date"][0] - self.start_date).days + list(
+                df_wastewater["viral_load"])  # set the entries between start_date and the first date of the data
+            # to be 0
+        return df_wastewater
+
 
     def read_hosp_related_data(self, hosp_filename):
         '''
