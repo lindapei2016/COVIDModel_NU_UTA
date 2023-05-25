@@ -118,7 +118,7 @@ class Plot:
         else:
             percent = 1
         if 'Seven-day Average' in self.compartment_names[self.var]:
-            n_day = self.instance.config["moving_avg_len"]
+            n_day = self.instance.moving_avg_len
             # Compute moving averages for simulation data
             self.sim_data = np.apply_along_axis(
                 lambda s: moving_avg(s, n_day, percent),
@@ -129,7 +129,7 @@ class Plot:
                 self.real_data = moving_avg(self.real_data.copy(), n_day, percent)
 
         elif 'Seven-day Sum' in self.compartment_names[self.var]:
-            n_day = self.instance.config["moving_avg_len"]
+            n_day = self.instance.moving_avg_len
             N = np.sum(self.instance.N, axis=(0, 1))
             self.sim_data = np.apply_along_axis(
                 lambda s: moving_sum(s, n_day, N),

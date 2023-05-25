@@ -59,7 +59,7 @@ class HistoricalStages:
 
     def compute_indicators_Austin(self, t):
         # Compute daily admissions moving average
-        moving_avg_start = np.maximum(0, t - self.instance.config["moving_avg_len"])
+        moving_avg_start = np.maximum(0, t - self.instance.moving_avg_len)
         if t > 0:
             criStat_avg = self.ToIHT_history[moving_avg_start:t].mean()
         else:
@@ -70,7 +70,7 @@ class HistoricalStages:
 
     def compute_indicators_CDC(self, t):
         # Compute daily admissions moving sum
-        moving_avg_start = np.maximum(0, t - self.instance.config["moving_avg_len"])
+        moving_avg_start = np.maximum(0, t - self.instance.moving_avg_len)
         hosp_adm_sum = 100000 * self.ToIHT_history[moving_avg_start:t].sum() / self.N.sum((0, 1))
 
         # Compute 7-day total new cases:
@@ -115,9 +115,8 @@ class HistoricalStages:
 
 austin = City(
     "austin",
-    "austin_test_IHT.json",
     "calendar.csv",
-    "setup_data_Final.json",
+    "austin_setup.json",
     "variant.json",
     "transmission.csv",
     "austin_real_hosp_updated.csv",

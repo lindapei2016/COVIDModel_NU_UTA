@@ -112,7 +112,7 @@ class CDCTierPolicy:
         ICU = np.array(ICU)
 
         # Compute daily admissions moving sum
-        moving_avg_start = np.maximum(0, t - self._instance.config["moving_avg_len"])
+        moving_avg_start = np.maximum(0, t - self._instance.moving_avg_len)
         hos_adm_total = ToIHT.sum((1, 2))
         hosp_adm_sum = 100000 * hos_adm_total[moving_avg_start:].sum() / N.sum((0, 1))
 
@@ -215,7 +215,7 @@ class MultiTierPolicy:
         ToIY = np.array(ToIY)
 
         # Compute daily admissions moving average
-        moving_avg_start = np.maximum(0, t - self._instance.config["moving_avg_len"])
+        moving_avg_start = np.maximum(0, t - self._instance.moving_avg_len)
 
         if len(ToIHT) > 0:
             criStat_total = ToIHT.sum((1, 2))

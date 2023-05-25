@@ -1,5 +1,12 @@
 {
   "city": "austin",
+  "moving_avg_len": 7,
+  "step_size": 9,
+  "chance_constraint_epsilon": 0.05,
+  "infeasible_field": "ICU",
+  "rd_start": "2020-05-20 00:00:00",
+  "rd_end": "2020-07-26 00:00:00",
+  "rd_rate": 0.9907470746928597,
   "simulation_start_date": "2020-02-28 00:00:00",
   "simulation_end_date": "2022-09-30 00:00:00",
   "hosp_beds": 1100,

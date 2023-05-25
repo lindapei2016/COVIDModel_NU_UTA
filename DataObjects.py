@@ -113,7 +113,6 @@ class City:
     def __init__(
             self,
             city,
-            config_filename,
             calendar_filename,
             setup_filename,
             variant_filename,
@@ -127,9 +126,6 @@ class City:
     ):
         self.city = city
         self.path_to_data = base_path / "instances" / f"{city}"
-
-        self.config = {}
-        self.load_config(config_filename)
 
         self.load_setup_data(setup_filename)
 
@@ -189,10 +185,6 @@ class City:
         self.weekday_longholidays = tuple(cal_df["Date"][cal_df["Calendar"] == 4])
 
         self.cal = self.build_calendar(transmission_filename)
-
-    def load_config(self, config_filename):
-        with open(str(self.path_to_data / config_filename), "r") as input_file:
-            self.config = json.load(input_file)
 
     def load_hosp_related_data(self, hosp_related_data_filenames,
                                real_history_hosp_related_data_vars):
