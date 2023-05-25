@@ -64,9 +64,8 @@ import numpy as np
 #   vaccination data
 
 austin = City("austin",
-              "austin_test_IHT.json",
               "calendar.csv",
-              "setup_data_Final.json",
+              "austin_setup.json",
               "variant.json",
               "transmission.csv",
               "austin_real_hosp_updated.csv",

@@ -39,7 +39,7 @@ class SimReplication:
         self.policy = policy
         self.rng_seed = rng_seed
 
-        self.step_size = self.instance.config["step_size"]
+        self.step_size = self.instance.step_size
         self.t_historical_data_end = len(self.instance.real_IH_history)
 
         # A is the number of age groups
@@ -170,7 +170,7 @@ class SimReplication:
         I0 = self.instance.I0
         A = self.instance.A
         L = self.instance.L
-        step_size = self.instance.config["step_size"]
+        step_size = self.instance.step_size
 
         self.vaccine_groups = []
 
@@ -430,15 +430,15 @@ class SimReplication:
 
         if self.instance.otherInfo == {}:
             rd_start = dt.datetime.strptime(
-                self.instance.config["rd_start"], datetime_formater
+                self.instance.rd_start, datetime_formater
             )
             rd_end = dt.datetime.strptime(
-                self.instance.config["rd_end"], datetime_formater
+                self.instance.rd_end, datetime_formater
             )
             if self.instance.cal.calendar.index(
                     rd_start
             ) < t <= self.instance.cal.calendar.index(rd_end):
-                epi.update_icu_params(self.instance.config["rd_rate"])
+                epi.update_icu_params(self.instance.rd_rate)
         else:
             epi.update_icu_all(t, self.instance.otherInfo)
 
