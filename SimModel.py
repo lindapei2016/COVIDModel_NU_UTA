@@ -510,9 +510,6 @@ class SimReplication:
 
                 dSprob_sum = dSprob_sum + dSprob
 
-                if np.any(dSprob_sum[:,0] != dSprob_sum[:,1]):
-                    breakpoint()
-
             for v_group in self.vaccine_groups:
 
                 # Shortcuts for attribute access to speed up simulation time
