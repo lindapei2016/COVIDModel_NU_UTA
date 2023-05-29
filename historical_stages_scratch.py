@@ -119,11 +119,7 @@ austin = City(
     "austin_setup.json",
     "variant.json",
     "transmission.csv",
-    "austin_real_hosp_updated.csv",
-    "austin_real_icu_updated.csv",
-    "austin_hosp_ad_updated.csv",
-    "austin_real_death_from_hosp_updated.csv",
-    "austin_real_death_from_home.csv",
+    "austin_hospital_home_timeseries.csv",
     "variant_prevalence.csv"
 )
 filename = 'austin_real_case.csv'
@@ -133,7 +129,7 @@ real_ToIY = pd.read_csv(
     date_parser=pd.to_datetime,
 )["admits"]
 
-real_IH = [ai - bi for (ai, bi) in zip(austin.real_IH_history, austin.real_ICU_history)]
+real_IH = [ai - bi for (ai, bi) in zip(austin.real_IH_history, austin.real_IH_history)]
 history_end_time = dt.datetime(2022, 3, 30)
 
 tiers_CDC = TierInfo("austin", "tiers_CDC.json")

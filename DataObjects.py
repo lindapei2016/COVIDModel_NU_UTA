@@ -117,11 +117,7 @@ class City:
             setup_filename,
             variant_filename,
             transmission_filename,
-            hospitalization_filename,
-            hosp_icu_filename,
-            hosp_admission_filename,
-            death_from_hosp_filename,
-            death_from_home_filename,
+            hospital_home_timeseries_filename,
             variant_prevalence_filename,
     ):
         self.city = city
@@ -129,20 +125,7 @@ class City:
 
         self.load_setup_data(setup_filename)
 
-        hosp_related_data_filenames = (hospitalization_filename,
-                                       hosp_icu_filename,
-                                       hosp_admission_filename,
-                                       death_from_hosp_filename,
-                                       death_from_home_filename)
-
-        real_history_hosp_related_data_vars = ("real_IH_history",
-                                               "real_ICU_history",
-                                               "real_ToIHT_history",
-                                               "real_ToICUD_history",
-                                               "real_ToIYD_history")
-
-        self.load_hosp_related_data(hosp_related_data_filenames,
-                                    real_history_hosp_related_data_vars)
+        self.load_hosp_related_data(hospital_home_timeseries_filename)
 
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Load prevalence data
@@ -186,37 +169,41 @@ class City:
 
         self.cal = self.build_calendar(transmission_filename)
 
-    def load_hosp_related_data(self, hosp_related_data_filenames,
-                               real_history_hosp_related_data_vars):
+    def load_hosp_related_data(self, hospital_home_timeseries_filename):
 
-        for i in range(len(hosp_related_data_filenames)):
-            filename = hosp_related_data_filenames[i]
-            var = real_history_hosp_related_data_vars[i]
-            setattr(self, var, self.read_hosp_file(filename))
+        # hospital_home_timeseries should have 5+1 columns
+        #   first column is "date" column
+        # Subsequent columns correspond to data_varnames, in order
 
-    def read_hosp_file(self, hosp_filename):
-        """
-        Helper function to read a hospitalization data file
-            and return an array with hospitalization counts.
-        """
+        data_varnames = ("real_IH_history",
+                         "real_ICU_history",
+                         "real_ToIHT_history",
+                         "real_ToICUD_history",
+                         "real_ToIYD_history")
 
         df_hosp = pd.read_csv(
-            str(self.path_to_data / hosp_filename),
+            str(self.path_to_data / hospital_home_timeseries_filename),
             parse_dates=["date"],
             date_parser=pd.to_datetime,
         )
 
         df_hosp = df_hosp[df_hosp["date"] <= self.simulation_end_date]
+        df_hosp = df_hosp[df_hosp["date"] >= self.simulation_start_date]
 
-        # if hospitalization data starts before self.simulation_start_date
-        if df_hosp["date"][0] <= self.simulation_start_date:
-            df_hosp = df_hosp[df_hosp["date"] >= self.simulation_start_date]
-            df_hosp = list(df_hosp["hospitalized"])
+        # If simulation starts before date that historical hospital data starts,
+        #   add 0s to historical hospital data for those dates
+        # Note this might mess up R^2 computations so be wary of interpreting the
+        #   R^2 in this context
+        if df_hosp["date"].iloc[0] > self.simulation_start_date:
+            num_historical_data_missing_days = df_hosp["date"][0].iloc[0] - self.simulation_start_date
         else:
-            df_hosp = [0] * (df_hosp["date"][0] - self.simulation_start_date).days + list(
-                df_hosp["hospitalized"]
-            )
-        return df_hosp
+            num_historical_data_missing_days = 0
+
+        # in df_hosp, first column is "date" so start after that column
+        for i in range(len(data_varnames)):
+            timeseries = [0] * num_historical_data_missing_days + list(df_hosp.columns[i+1])
+            setattr(self, data_varnames[i], timeseries)
+
 
     def load_setup_data(self, setup_filename):
         with open(str(self.path_to_data / setup_filename), "r") as input_file:

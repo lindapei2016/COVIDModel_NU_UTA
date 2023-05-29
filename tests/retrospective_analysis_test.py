@@ -34,11 +34,7 @@ class TestFixedCDCPolicy(unittest.TestCase):
             "austin_setup.json",
             "variant.json",
             "transmission.csv",
-            "austin_real_hosp_updated.csv",
-            "austin_real_icu_updated.csv",
-            "austin_hosp_ad_updated.csv",
-            "austin_real_death_from_hosp_updated.csv",
-            "austin_real_death_from_home.csv",
+            "austin_hospital_home_timeseries.csv",
             "variant_prevalence.csv"
         )
         self.tiers = TierInfo("austin", "tiers_CDC.json")
