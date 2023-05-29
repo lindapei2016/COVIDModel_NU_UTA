@@ -201,7 +201,7 @@ class City:
 
         # in df_hosp, first column is "date" so start after that column
         for i in range(len(data_varnames)):
-            timeseries = [0] * num_historical_data_missing_days + list(df_hosp.columns[i+1])
+            timeseries = [0] * num_historical_data_missing_days + list(df_hosp[df_hosp.columns[i+1]])
             setattr(self, data_varnames[i], timeseries)
 
 
