@@ -428,19 +428,16 @@ class SimReplication:
         else:
             immune_evasion = 0
 
-        if self.instance.otherInfo == {}:
-            rd_start = dt.datetime.strptime(
-                self.instance.rd_start, datetime_formater
-            )
-            rd_end = dt.datetime.strptime(
-                self.instance.rd_end, datetime_formater
-            )
-            if self.instance.cal.calendar.index(
-                    rd_start
-            ) < t <= self.instance.cal.calendar.index(rd_end):
-                epi.update_icu_params(self.instance.rd_rate)
-        else:
-            epi.update_icu_all(t, self.instance.otherInfo)
+        # Updates pIH, HICUR, etaICU based on timeseries specified in
+        #   otherInfo (additional columns in transmission.csv file)
+        # From group discussion, we will first create version of code
+        #   assuming all time series are specified
+        # Afterwards, we will add optionality -- provide a backup option
+        #   for values of pIH, HICUR, etaICU if user does not specify
+        #   timeseries for one or more of these parameters
+        #   (this was the previous functionality of rd_rate, etc...
+        #   but this has been removed from the setup .json file)
+        epi.update_icu_all(t, self.instance.otherInfo)
 
         step_size = self.step_size
         get_binomial_transition_quantity = self.get_binomial_transition_quantity

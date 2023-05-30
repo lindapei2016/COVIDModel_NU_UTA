@@ -169,6 +169,8 @@ class City:
 
         self.cal = self.build_calendar(transmission_filename)
 
+        self.load_other_info(transmission_filename)
+
     def load_hosp_related_data(self, hospital_home_timeseries_filename):
 
         # hospital_home_timeseries should have 5+1 columns
@@ -288,7 +290,6 @@ class City:
             date_parser=pd.to_datetime,
             float_precision="round_trip",
         )
-
 
         for dfk in df_transmission.keys():
             if (
@@ -723,11 +724,6 @@ class EpiSetup:
     def mu_ICU(self):
         """ This one increase the rate of death from ICU. """
         return self.mu_ICU0 * (1 + self.alpha_mu_ICU)
-
-    def update_icu_params(self, rdrate):
-        # update the ICU admission parameter HICUR and update nu
-        self.HICUR = self.HICUR * rdrate
-        self.pIH = 1 - (1 - self.pIH) * rdrate
 
     def update_icu_all(self, t, otherInfo):
         if "pIH" in otherInfo.keys():
