@@ -188,9 +188,9 @@ rep.reset()
 #   generation is necessary for perfectly replicable
 #   results).
 
-# We also discuss the optional second parameter in
-#   the simulate_time_period method, which is fixed_kappa_end_date,
-#   a nonnegative integer. This value corresponds to the last day
+# We also discuss the SimReplication instance attribute
+#   fixed_kappa_end_date, a nonnegative integer.
+#   This value corresponds to the last day
 #   at which historical data are used for transmission reduction
 #   (and cocooning) parameters. By default, this value is 0,
 #   which means that no historical data is used for these
@@ -202,16 +202,17 @@ rep.reset()
 # Also note that if a simulation replication is being run
 #   at timepoints t > fixed_kappa_end_date, there must be a
 #   MultiTierPolicy attached.
-# The optional second parameter is used for retrospective
-#   historical analysis and allows us to "play peek-a-boo"
+# fixed_kappa_end_date allows us to "play peek-a-boo"
 #   with historical data -- it allows us to incorporate a smaller
 #   subset of the historical data available rather than the
 #   entire set of historical data available.
 # Below is an example of running a simulation replication
 #   with historical transmission reduction for the first 100 days
 #   and then with simulated tier-dictated transmission reduction
-#   for
-rep.simulate_time_period(945, 100)
+#   afterwards.
+
+rep.fixed_kappa_end_date = 100
+rep.simulate_time_period(945)
 
 ###############################################################################
 

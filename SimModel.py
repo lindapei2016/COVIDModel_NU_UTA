@@ -41,6 +41,7 @@ class SimReplication:
 
         self.step_size = self.instance.step_size
         self.t_historical_data_end = len(self.instance.real_IH_history)
+        self.fixed_kappa_end_date = 0
 
         # A is the number of age groups
         # L is the number of risk groups
@@ -226,12 +227,10 @@ class SimReplication:
 
         if self.policy is None:
             return None
-        elif self.next_t < self.t_historical_data_end:
-            return None
 
         # Check whether ICU capacity has been violated
         if np.any(
-                np.array(self.ICU_history).sum(axis=(1, 2))[self.t_historical_data_end:]
+                np.array(self.ICU_history).sum(axis=(1, 2))[self.fixed_kappa_end_date:self.next_t]
                 > self.instance.icu
         ):
             return False
@@ -269,7 +268,7 @@ class SimReplication:
 
         return rsq
 
-    def simulate_time_period(self, time_end, fixed_kappa_end_date=0):
+    def simulate_time_period(self, time_end):
 
         """
         Advance the simulation model from time_start up to
@@ -284,16 +283,6 @@ class SimReplication:
 
         :param time_end: [int] nonnegative integer -- time t (number of days)
             to simulate up to.
-        :param fixed_kappa_end_date: the end date for fixed transmission
-            reduction (kappa). The staged-alert policy will be called after
-            this date. This is generally the end date of historical data, too.
-            Make sure the transmission.csv file has reduction values until and
-            including fixed_kappa_end_date. If fixed_kappa_end_date is 0,
-            the staged-alert policy will be called from the start of the
-            simulation date. If fixed_kappa_end_date is 0,
-            then staged-alert policy dictates fixed transmission reduction
-            (kappa), even if historical transmission reduction data
-            is available.
         :return: [None]
         """
 
@@ -305,7 +294,7 @@ class SimReplication:
 
             self.next_t += 1
 
-            self.simulate_t(t, fixed_kappa_end_date)
+            self.simulate_t(t)
             # print(t)
 
             A = self.instance.A
@@ -364,7 +353,7 @@ class SimReplication:
                     np.abs(total_imbalance) < 1e-2
             ), f"fPop unbalanced {total_imbalance} at time {self.instance.cal.calendar[t]}, {t}"
 
-    def simulate_t(self, t_date, fixed_kappa_end_date):
+    def simulate_t(self, t_date):
 
         """
         Advance the simulation 1 timepoint (day).
@@ -373,7 +362,6 @@ class SimReplication:
 
         :param t_date: [int] nonnegative integer corresponding to
             current timepoint to simulate.
-        :param fixed_kappa_end_date: see simulate_time_period
         :return: [None]
         """
 
@@ -389,7 +377,7 @@ class SimReplication:
 
         epi = copy.deepcopy(self.epi_rand)
 
-        if t <= fixed_kappa_end_date:
+        if t <= self.fixed_kappa_end_date:
             # If the transmission reduction is fixed don't call the policy object.
             phi_t = epi.effective_phi(
                 self.instance.cal.schools_closed[t],

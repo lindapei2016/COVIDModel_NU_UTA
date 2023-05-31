@@ -15,8 +15,6 @@
 #   and "policy" is an instance of MultiTierPolicy -- there's a distinction
 #   between the identifier for an object versus the actual object.
 
-# Linda Pei 2023
-
 ###############################################################################
 
 import numpy as np
@@ -105,9 +103,8 @@ def get_sample_paths(
         timepoints argument, not just final time
     :param fixed_kappa_end_date: [int] non-negative integer
        indicating last day to use fixed transmission reduction.
-       See same param passed to simulate_time_period
-       method of SimReplication object. Make sure transmission.csv
-       file has values up and including the last date in timepoints.
+       Make sure transmission.csv file has values up and
+       including the last date in timepoints.
     :param seed_assignment_func: [func] optional function
         mapping processor_rank to the random number seed
         that instantiates the random number generator
@@ -149,7 +146,8 @@ def get_sample_paths(
         #   and checking R-squared to eliminate bad
         #   sample paths early on
         for i in range(len(timepoints)):
-            rep.simulate_time_period(timepoints[i], fixed_kappa_end_date)
+            rep.fixed_kappa_end_date = fixed_kappa_end_date
+            rep.simulate_time_period(timepoints[i])
             rsq = rep.compute_rsq()
             if rsq < rsq_cutoff:
                 num_elim_per_stage[i] += 1
@@ -259,7 +257,7 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     Stage 1 threshold is always fixed to -1 (no social distancing).
 
     :param stage2_info: [3-tuple] with elements corresponding to
-        start point, end point, and step size (all must be integers)
+        start point, end point, and step size
         for candidate values for stage 2
     :param stage3_info: same as above but for stage 3
     :param stage4_info: same as above but for stage 4
@@ -293,9 +291,8 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
 
 def evaluate_policies_on_sample_paths(
         city,
-        tiers,
         vaccines,
-        thresholds_array,
+        policies_array,
         end_time,
         RNG,
         num_reps,
@@ -344,10 +341,7 @@ def evaluate_policies_on_sample_paths(
     :param city: [obj] instance of City
     :param tiers: [obj] instance of TierInfo
     :param vaccines: [obj] instance of Vaccine
-    :param thresholds_array: [list of tuples] arbitrary-length list of
-        5-tuples, where each 5-tuple has the form (-1, t2, t3, t4, t5)
-         with 0 <= t2 <= t3 <= t4 <= t5 < inf, corresponding to
-         thresholds for each tier.
+    :param policies_array: [list] of MultiTierPolicy or CDCTierPolicy objects
     :param end_time: [int] nonnegative integer, time at which to stop
         simulating and evaluating each policy -- must be greater (later than)
         the time at which the sample paths stopped
@@ -363,14 +357,6 @@ def evaluate_policies_on_sample_paths(
         files are saved in current working directory.
     :return: [None]
     """
-
-    # Create an array of MultiTierPolicy objects, one for each threshold
-    policies_array = np.array(
-        [
-            MultiTierPolicy(city, tiers, thresholds, "green")
-            for thresholds in thresholds_array
-        ]
-    )
 
     # Assign each processor its own set of MultiTierPolicy objects to simulate
     # Some processors have base_assignment
@@ -414,7 +400,7 @@ def evaluate_policies_on_sample_paths(
             base_rep.policy = policy
             base_rep.simulate_time_period(end_time)
 
-            thresholds_identifiers.append(base_rep.policy.lockdown_thresholds)
+            thresholds_identifiers.append(repr(base_rep.policy))
             costs_data.append(base_rep.compute_cost())
             feasibility_data.append(base_rep.compute_feasibility())
 
@@ -422,20 +408,27 @@ def evaluate_policies_on_sample_paths(
             base_rep.policy.reset()
             base_rep.reset()
 
+        # breakpoint()
+
         # Save results
         base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
         np.savetxt(
             base_csv_filename + "thresholds_identifiers.csv",
             np.array(thresholds_identifiers),
             delimiter=",",
+            fmt="%s"
         )
         np.savetxt(
-            base_csv_filename + "costs_data.csv", np.array(costs_data), delimiter=","
+            base_csv_filename + "costs_data.csv",
+            np.array(costs_data),
+            delimiter=",",
+            fmt="%s"
         )
         np.savetxt(
             base_csv_filename + "feasibility_data.csv",
             np.array(feasibility_data),
             delimiter=",",
+            fmt="%s"
         )
 
 
@@ -491,6 +484,7 @@ def evaluate_single_policy_on_sample_path(city: object,
             base_rep.rng = next_rng
 
         base_rep.policy = policy
+        base_rep.fixed_kappa_end_date = fixed_kappa_end_date
         base_rep.simulate_time_period(end_time)
         # Internally save the state of the random number generator
         #   to hand to the next sample path
