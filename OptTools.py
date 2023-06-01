@@ -18,9 +18,11 @@
 ###############################################################################
 
 import numpy as np
+import pandas as pd
 import datetime as dt
+from io import StringIO
 
-from SimObjects import MultiTierPolicy
+from SimObjects import MultiTierPolicy, CDCTierPolicy
 from DataObjects import City, TierInfo, Vaccine
 from SimModel import SimReplication
 from InputOutputTools import import_rep_from_json, export_rep_to_json
@@ -335,6 +337,9 @@ def evaluate_policies_on_sample_paths(
         File type [3]'s ith entry is whether the ith policy that processor_rank
         simulated is feasible on that replication.
 
+    Note (and something to make more consistent later) -- reps start at 1
+        even though processor rank starts at 0
+
     This function can be parallelized by passing a unique
         processor_rank to each function call.
 
@@ -397,10 +402,13 @@ def evaluate_policies_on_sample_paths(
 
         # Iterate through each policy
         for policy in policies_array[slicepoints[processor_rank]:slicepoints[processor_rank + 1]]:
+
             base_rep.policy = policy
             base_rep.simulate_time_period(end_time)
 
-            thresholds_identifiers.append(repr(base_rep.policy))
+            thrs_str = repr(base_rep.policy)
+            thrs_str = thrs_str.replace(", ", "-")
+            thresholds_identifiers.append(thrs_str)
             costs_data.append(base_rep.compute_cost())
             feasibility_data.append(base_rep.compute_feasibility())
 
@@ -415,7 +423,6 @@ def evaluate_policies_on_sample_paths(
         np.savetxt(
             base_csv_filename + "thresholds_identifiers.csv",
             np.array(thresholds_identifiers),
-            delimiter=",",
             fmt="%s"
         )
         np.savetxt(
@@ -430,6 +437,56 @@ def evaluate_policies_on_sample_paths(
             delimiter=",",
             fmt="%s"
         )
+
+
+def aggregate_evaluated_policies(num_reps,
+                                 processor_count_total):
+    '''
+    Called after evaluate_policies_on_sample_paths is completed
+        to parse the .csv files that are output
+    Aggregates .csv files from parallel processors into
+        one dataframe
+
+    See evaluate_policies_on_sample_paths for definitions of
+        parameters
+
+    Assume that .csv files have the filename form
+    "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
+        + "thresholds_identifiers.csv" or
+        + "costs_data.csv" or
+        + "feasibility_data.csv"
+
+    Note (and something to make more consistent later) -- reps start at 1
+        even though processor rank starts at 0
+    '''
+
+    costs_data_dict = {}
+    feasibility_data_dict = {}
+
+    for processor_rank in np.arange(processor_count_total):
+        for rep in np.arange(num_reps):
+            base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
+            thresholds_identifiers = \
+                np.atleast_1d(np.genfromtxt(base_csv_filename + "thresholds_identifiers.csv", delimiter=","))
+            costs_data = \
+                np.atleast_1d(np.genfromtxt(base_csv_filename + "costs_data.csv", delimiter=","))
+            feasibility_data = \
+                np.atleast_1d(np.genfromtxt(base_csv_filename + "feasibility_data.csv", delimiter=","))
+
+            for ix in range(len(thresholds_identifiers)):
+                thrs = thresholds_identifiers[ix]
+                if thrs in costs_data_dict:
+                    costs_data_dict[thrs].append(costs_data[ix])
+                    feasibility_data_dict[thrs].append(feasibility_data[ix])
+                else:
+                    costs_data_dict[thrs] = [costs_data[ix]]
+                    feasibility_data_dict[thrs] = [feasibility_data[ix]]
+
+    costs_df = pd.DataFrame.from_dict(costs_data_dict)
+    feasibility_df = pd.DataFrame.from_dict(feasibility_data_dict)
+
+    costs_df.to_csv("costs_df.csv", sep=",")
+    feasibility_df.to_csv("costs_df.csv", sep=",")
 
 
 def evaluate_single_policy_on_sample_path(city: object,

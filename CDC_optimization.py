@@ -26,6 +26,12 @@ master_rank = size - 1
 
 ###############################################################################
 
+# OptTools.aggregate_evaluated_policies(1, 4)
+
+# breakpoint()
+
+###############################################################################
+
 austin = City("austin",
               "calendar.csv",
               "austin_setup.json",
@@ -74,18 +80,18 @@ policies = []
 
 # This creates 66 policies
 non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-                                                   (0.05, 0.6, 0.05),
-                                                   (0.05, 0.6, 0.05),
-                                                   (0.05, 0.6, 0.05))
+                                                   (0.05, 0.5, 0.05),
+                                                   (0.05, 0.5, 0.05),
+                                                   (0.05, 0.5, 0.05))
 
 for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
     staffed_thresholds = {}
-    staffed_thresholds["non_surge"] = (non_surge_staffed_thresholds[1],
-                                       non_surge_staffed_thresholds[2],
-                                       non_surge_staffed_thresholds[3])
+    staffed_thresholds["non_surge"] = (non_surge_staffed_thresholds[2],
+                                       non_surge_staffed_thresholds[3],
+                                       non_surge_staffed_thresholds[4])
     staffed_thresholds["surge"] = (-1,
-                                   non_surge_staffed_thresholds[2],
-                                   non_surge_staffed_thresholds[2])
+                                   non_surge_staffed_thresholds[3],
+                                   non_surge_staffed_thresholds[3])
     policy = CDCTierPolicy(austin,
                            tiers,
                            case_threshold,
@@ -95,7 +101,7 @@ for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
 
 # For desktop debugging / if no MPI...
 # rank = 1
-# size = 2
+# size = 66
 
 # First peak only
 OptTools.evaluate_policies_on_sample_paths(
@@ -104,7 +110,7 @@ OptTools.evaluate_policies_on_sample_paths(
         policies_array=policies,
         end_time=215,
         RNG=np.random.Generator(np.random.MT19937(100).jumped(rank)),
-        num_reps=20,
+        num_reps=50,
         processor_rank=rank,
         processor_count_total=size,
         base_filename=str(1)+"_",
