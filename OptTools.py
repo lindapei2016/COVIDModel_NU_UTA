@@ -416,8 +416,6 @@ def evaluate_policies_on_sample_paths(
             base_rep.policy.reset()
             base_rep.reset()
 
-        # breakpoint()
-
         # Save results
         base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
         np.savetxt(
@@ -438,6 +436,9 @@ def evaluate_policies_on_sample_paths(
             fmt="%s"
         )
 
+
+def find_optimal_feasible_policy(costs_df_filename, feasibility_df_filename):
+    pass
 
 def aggregate_evaluated_policies(num_reps,
                                  processor_count_total):
@@ -467,11 +468,14 @@ def aggregate_evaluated_policies(num_reps,
         for rep in np.arange(num_reps):
             base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
             thresholds_identifiers = \
-                np.atleast_1d(np.genfromtxt(base_csv_filename + "thresholds_identifiers.csv", delimiter=","))
+                pd.read_csv(base_csv_filename + "thresholds_identifiers.csv", header=None)
+            thresholds_identifiers = thresholds_identifiers.to_numpy().flatten()
             costs_data = \
-                np.atleast_1d(np.genfromtxt(base_csv_filename + "costs_data.csv", delimiter=","))
+                pd.read_csv(base_csv_filename + "costs_data.csv", header=None)
+            costs_data = costs_data.to_numpy().flatten()
             feasibility_data = \
-                np.atleast_1d(np.genfromtxt(base_csv_filename + "feasibility_data.csv", delimiter=","))
+                pd.read_csv(base_csv_filename + "feasibility_data.csv", header=None)
+            feasibility_data = feasibility_data.to_numpy().flatten()
 
             for ix in range(len(thresholds_identifiers)):
                 thrs = thresholds_identifiers[ix]
@@ -486,7 +490,7 @@ def aggregate_evaluated_policies(num_reps,
     feasibility_df = pd.DataFrame.from_dict(feasibility_data_dict)
 
     costs_df.to_csv("costs_df.csv", sep=",")
-    feasibility_df.to_csv("costs_df.csv", sep=",")
+    feasibility_df.to_csv("feasibility_df.csv", sep=",")
 
 
 def evaluate_single_policy_on_sample_path(city: object,

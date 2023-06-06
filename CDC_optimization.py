@@ -10,7 +10,10 @@ from SimObjects import MultiTierPolicy, CDCTierPolicy
 from DataObjects import City, TierInfo, Vaccine
 from SimModel import SimReplication
 import InputOutputTools
-import OptTools
+from OptTools import thresholds_generator,\
+    get_sample_paths, \
+    evaluate_policies_on_sample_paths, \
+    aggregate_evaluated_policies
 
 # Import other Python packages
 import numpy as np
@@ -26,11 +29,8 @@ master_rank = size - 1
 
 ###############################################################################
 
-# OptTools.aggregate_evaluated_policies(1, 4)
-
-# breakpoint()
-
-###############################################################################
+# Notice that we are using tiers_CDC.json here for the tiers
+# Initialize key instances for the Austin simulation
 
 austin = City("austin",
               "calendar.csv",
@@ -50,23 +50,28 @@ vaccines = Vaccine(austin,
 
 ###############################################################################
 
-# This is very similar to how we run the usual code, we just need to define the staged-alert policy with the
-# CDC system method. The system has three different indicators; Case counts, Hospital admissions and  Percent hospital
-# beds. Depending on the case count threshold the other two indicators take different values. I define them as
-# "non_surge" and "surge" but we can change those later if we want to do more general systems.
+# Step 1: generate sample paths
+# For each parallel processor, obtain 50 sample paths for
+#   each of the 4 peaks
+# First timepoint of 25 is just to speed up sample path generation
+#   using timeblocks method
+# Timepoints corresponding to 93, 276, 502, and 641 correspond to
+#   start of 4 peaks
+get_sample_paths(austin,
+                 vaccines,
+                 0.75,
+                 50,
+                 timepoints=(25, 93, 276, 502, 641),
+                 processor_rank=rank,
+                 save_intermediate_states=True,
+                 storage_folder_name="states",
+                 fixed_kappa_end_date=763)
 
-# start = time.time()
-
+# Step 2:
 case_threshold = 200
 hosp_adm_thresholds = {"non_surge": (10, 20, 20), "surge": (-1, 10, 10)}
 # staffed_thresholds = {"non_surge": (-1, -1, 0.1, 0.15, 0.15), "surge": (-1, -1, -1, 0.1, 0.1)}
 
-# CDC threshold uses 7-day sum of hospital admission per 100k. The equivalent values if we were to use 7-day avg.
-# hospital admission instead are as follows. We use equivalent thresholds to plot and evaluate the results in our
-# indicator. I used the same CDC thresholds all the time but if we decide to optimize CDC threshold, we can calculate
-# the equivalent values in the model and save to the policy.json.
-# equivalent_thresholds = {"non_surge": (-1, -1, 28.57, 57.14, 57.14), "surge": (-1, -1, -1, 28.57, 28.57)}
-# ctp = CDCTierPolicy(austin, tiers, case_threshold, hosp_adm_thresholds, staffed_thresholds)
 
 ###############################################################################
 
@@ -79,19 +84,19 @@ hosp_adm_thresholds = {"non_surge": (10, 20, 20), "surge": (-1, 10, 10)}
 policies = []
 
 # This creates 66 policies
-non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
+non_surge_staffed_thresholds_array = thresholds_generator((-1, 0, 1),
                                                    (0.05, 0.5, 0.05),
                                                    (0.05, 0.5, 0.05),
                                                    (0.05, 0.5, 0.05))
 
+
 for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-    staffed_thresholds = {}
-    staffed_thresholds["non_surge"] = (non_surge_staffed_thresholds[2],
-                                       non_surge_staffed_thresholds[3],
-                                       non_surge_staffed_thresholds[4])
-    staffed_thresholds["surge"] = (-1,
-                                   non_surge_staffed_thresholds[3],
-                                   non_surge_staffed_thresholds[3])
+    staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                        non_surge_staffed_thresholds[3],
+                                        non_surge_staffed_thresholds[4]),
+                          "surge": (-1,
+                                    non_surge_staffed_thresholds[3],
+                                    non_surge_staffed_thresholds[3])}
     policy = CDCTierPolicy(austin,
                            tiers,
                            case_threshold,
@@ -99,12 +104,9 @@ for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
                            staffed_thresholds)
     policies.append(policy)
 
-# For desktop debugging / if no MPI...
-# rank = 1
-# size = 66
 
 # First peak only
-OptTools.evaluate_policies_on_sample_paths(
+evaluate_policies_on_sample_paths(
         austin,
         vaccines,
         policies_array=policies,
@@ -116,3 +118,46 @@ OptTools.evaluate_policies_on_sample_paths(
         base_filename=str(1)+"_",
         storage_folder_name="states"
 )
+
+evaluate_policies_on_sample_paths(
+        austin,
+        vaccines,
+        policies_array=policies,
+        end_time=397,
+        RNG=np.random.Generator(np.random.MT19937(100).jumped(rank)),
+        num_reps=50,
+        processor_rank=rank,
+        processor_count_total=size,
+        base_filename=str(1)+"_",
+        storage_folder_name="states"
+)
+
+evaluate_policies_on_sample_paths(
+        austin,
+        vaccines,
+        policies_array=policies,
+        end_time=625,
+        RNG=np.random.Generator(np.random.MT19937(100).jumped(rank)),
+        num_reps=50,
+        processor_rank=rank,
+        processor_count_total=size,
+        base_filename=str(1)+"_",
+        storage_folder_name="states"
+)
+
+evaluate_policies_on_sample_paths(
+        austin,
+        vaccines,
+        policies_array=policies,
+        end_time=762,
+        RNG=np.random.Generator(np.random.MT19937(100).jumped(rank)),
+        num_reps=50,
+        processor_rank=rank,
+        processor_count_total=size,
+        base_filename=str(1)+"_",
+        storage_folder_name="states"
+)
+
+aggregate_evaluated_policies(50, 165)
+
+###############################################################################
