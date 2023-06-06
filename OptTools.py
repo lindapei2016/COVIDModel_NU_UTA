@@ -168,7 +168,7 @@ def get_sample_paths(
         if valid:
             num_good_reps += 1
             all_rsq.append(rsq)
-            identifier = str(processor_rank) + "_" + str(num_good_reps)
+            identifier = str(processor_rank) + "_" + str(num_good_reps - 1)
 
             # Starting from last time in timepoints, save states
             #   of acceptable sample paths
@@ -217,7 +217,7 @@ def get_sample_paths(
                             base_path / storage_folder_name / (identifier + "_" + t + "_v2.json"),
                             base_path / storage_folder_name / (identifier + "_" + t + "_v3.json"),
                             None,
-                            base_path / storage_folder_name / (identifier + "_epi_params.json"),
+                            base_path / storage_folder_name / (identifier + "_" + t + "_epi_params.json"),
                         )
 
         # Internally save the state of the random number generator
@@ -289,210 +289,29 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     return feasible_combos
 
 
-###############################################################################
-
-def evaluate_policies_on_sample_paths(
-        city,
-        vaccines,
-        policies_array,
-        end_time,
-        RNG,
-        num_reps,
-        processor_rank,
-        processor_count_total,
-        base_filename,
-        storage_folder_name=""
+def evaluate_one_policy_one_sample_path(
+        policy,
+        sim_rep,
+        end_time
 ):
-    """
-    Creates a MultiTierPolicy object for each threshold in
-        thresholds_array, partitions these policies amongst
-        processor_count_total processors, simulates these
-        policies starting from pre-saved sample paths up to
-        time end_time, and exports the results.
-
-    There must be num_reps sample paths saved and located
-        in the same working directory as the main script calling
-        this function.
-    We assume each sample path has 6 .json files with the following
-        filename format:
-        base_json_filename + "sim.json"
-        base_json_filename + "v0.json"
-        base_json_filename + "v1.json"
-        base_json_filename + "v2.json"
-        base_json_filename + "v3.json"
-        base_json_filename + "epi_params.json"
-    See module InputOutputTools for fields of each type of .json file.
-
-    Results are saved for each replication in 3 .csv files with the
-        following filename suffixes:
-        [1] "thresholds_identifiers.csv"
-        [2] "costs_data.csv"
-        [3] "feasibility_data.csv"
-    If processor_rank was assigned num_policies policies to simulate,
-        then the above .csv files each contain num_policies entries.
-    For each replication, .csv file type [1]'s ith entry is the
-        (unique) threshold identifier of the ith policy that processor_rank
-        simulated. File type [2]'s ith entry is the realized cost
-        of the ith policy that processor_rank simulated on that replication.
-        File type [3]'s ith entry is whether the ith policy that processor_rank
-        simulated is feasible on that replication.
-
-    Note (and something to make more consistent later) -- reps start at 1
-        even though processor rank starts at 0
-
-    This function can be parallelized by passing a unique
-        processor_rank to each function call.
-
-    :param city: [obj] instance of City
-    :param tiers: [obj] instance of TierInfo
-    :param vaccines: [obj] instance of Vaccine
-    :param policies_array: [list] of MultiTierPolicy or CDCTierPolicy objects
+    '''
+    :param policy: [obj] MultiTierPolicy or CDCTierPolicy instance
+    :param sim_rep: [obj] SimReplication instance
     :param end_time: [int] nonnegative integer, time at which to stop
         simulating and evaluating each policy -- must be greater (later than)
         the time at which the sample paths stopped
-    :param RNG: [obj] instance of np.random.default_rng(),
-        a random number generator
-    :param num_reps: [int] number of sample paths to test policies on
-    :param processor_rank: [int] nonnegative unique identifier of
-        the parallel processor
-    :param processor_count_total: [int] total number of processors
-    :param base_filename: [str] prefix common to all filenames
-    :param storage_folder_name: [str] string corresponding
-        to folder in which to save .json files. If empty string,
-        files are saved in current working directory.
-    :return: [None]
-    """
-
-    # Assign each processor its own set of MultiTierPolicy objects to simulate
-    # Some processors have base_assignment
-    # Others have base_assignment + 1
-    num_policies = len(policies_array)
-    base_assignment = int(np.floor(num_policies / processor_count_total))
-    leftover = num_policies % processor_count_total
-
-    slicepoints = np.append([0],
-                            np.cumsum(np.append(np.full(leftover, base_assignment + 1),
-                                                np.full(processor_count_total - leftover, base_assignment))))
-
-    if storage_folder_name != "":
-        base_filename = base_path / storage_folder_name / base_filename
-
-    # Iterate through each replication
-    for rep in range(num_reps):
-
-        # Load the sample path from .json files for each replication
-        base_json_filename = str(base_filename) + str(rep + 1) + "_"
-        base_rep = SimReplication(city, vaccines, None, 1)
-        import_rep_from_json(
-            base_rep,
-            base_json_filename + "sim.json",
-            base_json_filename + "v0.json",
-            base_json_filename + "v1.json",
-            base_json_filename + "v2.json",
-            base_json_filename + "v3.json",
-            None,
-            base_json_filename + "epi_params.json",
-        )
-        if rep == 0:
-            base_rep.rng = RNG
-
-        thresholds_identifiers = []
-        costs_data = []
-        feasibility_data = []
-
-        # Iterate through each policy
-        for policy in policies_array[slicepoints[processor_rank]:slicepoints[processor_rank + 1]]:
-
-            base_rep.policy = policy
-            base_rep.simulate_time_period(end_time)
-
-            thrs_str = repr(base_rep.policy)
-            thrs_str = thrs_str.replace(", ", "-")
-            thresholds_identifiers.append(thrs_str)
-            costs_data.append(base_rep.compute_cost())
-            feasibility_data.append(base_rep.compute_feasibility())
-
-            # Clear the policy and simulation replication history
-            base_rep.policy.reset()
-            base_rep.reset()
-
-        # Save results
-        base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
-        np.savetxt(
-            base_csv_filename + "thresholds_identifiers.csv",
-            np.array(thresholds_identifiers),
-            fmt="%s"
-        )
-        np.savetxt(
-            base_csv_filename + "costs_data.csv",
-            np.array(costs_data),
-            delimiter=",",
-            fmt="%s"
-        )
-        np.savetxt(
-            base_csv_filename + "feasibility_data.csv",
-            np.array(feasibility_data),
-            delimiter=",",
-            fmt="%s"
-        )
-
-
-def find_optimal_feasible_policy(costs_df_filename, feasibility_df_filename):
-    pass
-
-def aggregate_evaluated_policies(num_reps,
-                                 processor_count_total):
     '''
-    Called after evaluate_policies_on_sample_paths is completed
-        to parse the .csv files that are output
-    Aggregates .csv files from parallel processors into
-        one dataframe
-
-    See evaluate_policies_on_sample_paths for definitions of
-        parameters
-
-    Assume that .csv files have the filename form
-    "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
-        + "thresholds_identifiers.csv" or
-        + "costs_data.csv" or
-        + "feasibility_data.csv"
-
-    Note (and something to make more consistent later) -- reps start at 1
-        even though processor rank starts at 0
-    '''
-
-    costs_data_dict = {}
-    feasibility_data_dict = {}
-
-    for processor_rank in np.arange(processor_count_total):
-        for rep in np.arange(num_reps):
-            base_csv_filename = "proc" + str(processor_rank) + "_rep" + str(rep + 1) + "_"
-            thresholds_identifiers = \
-                pd.read_csv(base_csv_filename + "thresholds_identifiers.csv", header=None)
-            thresholds_identifiers = thresholds_identifiers.to_numpy().flatten()
-            costs_data = \
-                pd.read_csv(base_csv_filename + "costs_data.csv", header=None)
-            costs_data = costs_data.to_numpy().flatten()
-            feasibility_data = \
-                pd.read_csv(base_csv_filename + "feasibility_data.csv", header=None)
-            feasibility_data = feasibility_data.to_numpy().flatten()
-
-            for ix in range(len(thresholds_identifiers)):
-                thrs = thresholds_identifiers[ix]
-                if thrs in costs_data_dict:
-                    costs_data_dict[thrs].append(costs_data[ix])
-                    feasibility_data_dict[thrs].append(feasibility_data[ix])
-                else:
-                    costs_data_dict[thrs] = [costs_data[ix]]
-                    feasibility_data_dict[thrs] = [feasibility_data[ix]]
-
-    costs_df = pd.DataFrame.from_dict(costs_data_dict)
-    feasibility_df = pd.DataFrame.from_dict(feasibility_data_dict)
-
-    costs_df.to_csv("costs_df.csv", sep=",")
-    feasibility_df.to_csv("feasibility_df.csv", sep=",")
+    sim_rep.policy = policy
+    sim_rep.simulate_time_period(end_time)
+    cost = sim_rep.compute_cost()
+    feasibility = sim_rep.compute_feasibility()
+    return cost, feasibility
 
 
+###############################################################################
+
+# LP note -- this is Nazli's function -- I need to check to make sure
+#   I didn't break this when making OptTools edits
 def evaluate_single_policy_on_sample_path(city: object,
                                           vaccines: object,
                                           policy: object,
