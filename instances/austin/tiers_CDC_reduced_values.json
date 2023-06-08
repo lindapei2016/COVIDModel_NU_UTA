@@ -1,0 +1,31 @@
+{
+"tiers": [
+    {
+        "name": "Stage 1",
+        "transmission_reduction":  0.48875,
+        "cocooning":  0.48875,
+        "school_closure": 0,
+        "min_enforcing_time": 1,
+        "daily_cost": 1,
+        "color": "blue"
+    },
+    {
+        "name": "Stage 2",
+        "transmission_reduction": 0.5844,
+        "cocooning": 0.5844,
+        "school_closure": 0,
+        "min_enforcing_time": 1,
+        "daily_cost": 10,
+        "color": "yellow"
+    },
+    {
+        "name": "Stage 3",
+        "transmission_reduction": 0.68,
+        "cocooning": 0.68,
+        "school_closure": 1,
+        "min_enforcing_time": 1,
+        "daily_cost": 10000,
+        "color": "red"
+    }
+    ]
+}
