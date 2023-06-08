@@ -44,7 +44,7 @@ vaccines = Vaccine(
 # tiers file contains the staged-alert levels with the corresponding transmission reductions:
 # CDC system has three levels and Austin system has four levels.
 tiers_CDC = TierInfo("austin", "tiers_CDC.json")
-tiers_austin = TierInfo("austin", "tiers5_opt_Final.json")
+tiers_austin = TierInfo("austin", "tiers4.json")
 
 # Define the threshold values for each indicator:
 thresholds_austin = (-1, 0, 15, 25, 50)  # Austin's system has one indicator.

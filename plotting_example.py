@@ -41,7 +41,7 @@ vaccines = Vaccine(
     "booster_allocation_fixed.csv",
     "vaccine_allocation_fixed.csv",
 )
-tiers_austin = TierInfo("austin", "tiers5_opt_Final.json")
+tiers_austin = TierInfo("austin", "tiers4.json")
 thresholds_austin = (-1, 15, 25, 50)  # Austin's system has one indicator.
 mtp = MultiTierPolicy(austin, tiers_austin, thresholds_austin, "green")
 
