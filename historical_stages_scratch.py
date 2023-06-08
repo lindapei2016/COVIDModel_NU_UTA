@@ -164,8 +164,8 @@ plot = Plot(austin, history_end_time, austin.real_ToIHT_history, redundant_data,
 # plot.vertical_plot([data["tier_history"]], tier_colors_ctp, 1100)
 
 ######################################################################################
-tiers = TierInfo("austin", "tiers5_opt_Final.json")
-thresholds = (-1, 0, 15, 25, 50)
+tiers = TierInfo("austin", "tiers4.json")
+thresholds = (-1, 15, 25, 50)
 mtp = MultiTierPolicy(austin, tiers, thresholds, "green")
 historic_stages_austin = HistoricalStages(austin,
                                           tiers.tier,
