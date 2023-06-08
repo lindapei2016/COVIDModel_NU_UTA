@@ -54,7 +54,8 @@ def moving_sum(data, n_day, total_population):
     Take the n-day moving sum per 100k of the simulation data.
     :return:
     """
-    return [data[max(0, i - n_day): i].sum() * 100000 / total_population if i - n_day > 0 else 0 for i in range(len(data))]
+    return [data[max(0, i - n_day): i].sum() * 100000 / total_population if i - n_day > 0 else 0 for i in
+            range(len(data))]
 
 
 ######################################################################################
@@ -82,7 +83,7 @@ class Plot:
         # TODO: fix this part later:
         if sim_data is not None:
             if var == "ToIY_history_sum":
-                self.sim_data = [np.sum(s, axis=(1, 2)) * 0.4 for s in sim_data]
+                self.sim_data = [np.sum(s, axis=(1, 2)) * 0.6 for s in sim_data]
             else:
                 self.sim_data = [np.sum(s, axis=(1, 2)) for s in sim_data]
         else:
@@ -103,8 +104,11 @@ class Plot:
 
         self.path_to_plot = base_path / "plots"
 
-        self.fig, (self.ax1, self.actions_ax) = plt.subplots(2, 1, figsize=(17, 9),
-                                                             gridspec_kw={'height_ratios': [10, 1.1]})
+        self.fig, (self.ax1, self.year_ax, self.actions_ax) = plt.subplots(3, 1, figsize=(17, 9),
+                                                                           gridspec_kw={'height_ratios': [10, 0.7, 1.1]}
+                                                                           )
+
+        plt.subplots_adjust(hspace=0.15)
         self.policy_ax = self.ax1.twinx()
         self.base_plot(color)
 
@@ -148,20 +152,27 @@ class Plot:
         self.ax1.plot(range(self.T), self.sim_data[self.central_path], color[0])
 
         # plot a vertical line to separate history from projections:
-        # self.ax1.vlines(self.T_real, 0, self.y_lim[self.var], colors='k', linewidth=3)
-        self.ax1.vlines(self.instance.cal.calendar.index(dt(2021, 11, 30)), 0, self.y_lim[self.var], colors='k', linewidth=3)
+        self.ax1.vlines(self.T_real, 0, self.y_lim[self.var], colors='k', linewidth=3)
+        # self.ax1.vlines(self.instance.cal.calendar.index(dt(2021, 11, 30)), 0, self.y_lim[self.var], colors='k',
+        #                 linewidth=3)
+
+        # self.actions_ax.vlines(self.T_real, 0, self.y_lim[self.var], colors='k',
+        #                        linewidth=3)
         # Plot styling:
         # Axis limits:
         self.ax1.set_ylim(0, self.y_lim[self.var])
+        self.year_ax.set_ylim(0, 1)
         self.policy_ax.set_ylim(0, self.y_lim[self.var])
         self.ax1.set_ylabel(self.compartment_names[self.var])
         self.actions_ax.set_xlim(0, self.T)
+        self.year_ax.set_xlim(0, self.T)
         self.set_x_axis()
         # Order of layers
         self.ax1.set_zorder(self.policy_ax.get_zorder() + 10)  # put ax in front of policy_ax
         self.ax1.patch.set_visible(False)  # hide the 'canvas'
         # Plot margins
         self.actions_ax.margins(0)
+        self.year_ax.margins(0)
         self.ax1.margins(0)
         self.policy_ax.margins(0)
 
@@ -178,25 +189,31 @@ class Plot:
         Set the months and years on the x-axis of the plot.
         """
         # Axis ticks: write the name of the month on the x-axis:
-        self.ax1.xaxis.set_ticks(
+        axis = self.ax1  # self.actions_ax
+        axis.xaxis.set_ticks(
             [t for t, d in enumerate(self.instance.cal.calendar) if (d.day == 1 and d.month % 2 == 1)])
-        self.ax1.xaxis.set_ticklabels(
+        axis.xaxis.set_ticklabels(
             [f' {py_cal.month_abbr[d.month]} ' for t, d in enumerate(self.instance.cal.calendar) if
              (d.day == 1 and d.month % 2 == 1)],
             rotation=0,
             fontsize=22)
 
-        for tick in self.ax1.xaxis.get_major_ticks():
+        for tick in axis.xaxis.get_major_ticks():
             tick.label1.set_horizontalalignment('left')
-        self.ax1.tick_params(axis='y', labelsize=self.text_size, length=5, width=2)
-        self.ax1.tick_params(axis='x', length=5, width=2)
+        axis.tick_params(axis='y', labelsize=self.text_size, length=5, width=2)
+        axis.tick_params(axis='x', length=5, width=2)
 
         # Clean up the action_ax and policy_ax to write the years there:
-        self.actions_ax.margins(0)
         self.actions_ax.spines['top'].set_visible(False)
         self.actions_ax.spines['bottom'].set_visible(False)
         self.actions_ax.spines['left'].set_visible(False)
         self.actions_ax.spines['right'].set_visible(False)
+
+        self.year_ax.spines['top'].set_visible(False)
+        self.year_ax.spines['bottom'].set_visible(False)
+        self.year_ax.spines['left'].set_visible(False)
+        self.year_ax.spines['right'].set_visible(False)
+
         self.policy_ax.tick_params(
             axis='both',  # changes apply to the x-axis
             which='both',  # both major and minor ticks are affected
@@ -208,10 +225,22 @@ class Plot:
         self.actions_ax.tick_params(
             axis='both',  # changes apply to the x-axis
             which='both',  # both major and minor ticks are affected
-            bottom=False,  # ticks along the bottom edge are off
+            bottom=False,
             left=False,  # ticks along the top edge are off
+            labelleft=False,
             labelbottom=False,
-            labelleft=False)  # labels along the bottom edge are off
+            labelright=False
+        )  # labels along the bottom edge are off
+
+        self.year_ax.tick_params(
+            axis='both',  # changes apply to the x-axis
+            which='both',  # both major and minor ticks are affected
+            bottom=False,
+            left=False,  # ticks along the top edge are off
+            labelleft=False,
+            labelbottom=False,
+            labelright=False
+        )
 
         year_list = {2020, 2021, 2022}  # fix this part later.
         year_ticks = {}
@@ -225,12 +254,12 @@ class Plot:
                 year_ticks[year] = t2
         # write down the year on the plot axis:
         for year in year_ticks:
-            self.actions_ax.annotate(year,
-                                     xy=(year_ticks[year], 0),
-                                     xycoords='data',
-                                     color='k',
-                                     annotation_clip=True,
-                                     fontsize=self.text_size - 2)
+            self.year_ax.annotate(year,
+                                  xy=(year_ticks[year], 0.0),
+                                  xycoords='data',
+                                  color='k',
+                                  annotation_clip=True,
+                                  fontsize=self.text_size - 2)
 
     def horizontal_plot(self, thresholds, tier_colors):
         """
@@ -286,8 +315,9 @@ class Plot:
     def save_plot(self, plot_type):
         """ Save the plot in a png format to /plots directory. """
         plt.savefig(
-            self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.var}_{plot_type}.png",
-            bbox_inches='tight')
+            self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.instance.hosp_beds}_{self.var}_{plot_type}.png",
+            bbox_inches='tight'
+        )
 
     def vertical_plot(self, tier_history, tier_colors: dict, cap_limit=0):
         """
@@ -304,7 +334,7 @@ class Plot:
 
         Returns None
         """
-        policy_start_date = tier_history.count(None)
+        policy_start_date = tier_history[0].count(None)
         for u in range(len(tier_colors)):
             u_color = tier_colors[u]
             u_alpha = 0.6
@@ -322,7 +352,13 @@ class Plot:
             self.ax1.hlines(cap_limit, 0, self.T, colors='k', linewidth=3)
         self.save_plot("vertical")
 
-    def dali_plot(self, tier_history, tier_colors: dict, cap_limit=0):
+    def dali_plot(self,
+                  tier_history,
+                  tier_colors: dict,
+                  cap_limit=0,
+                  legend=None,
+                  tier_history2=None,
+                  tier_colors2=None):
         """
         Plot the tier history colors. Different sample paths may be in different stages during the same time period.
         color the background to tier color according the percent of paths in that particular tier during a particular
@@ -335,7 +371,7 @@ class Plot:
         tier_history: historical alert-stages determined by the policy.
         tier_colors: colors corresponding to each staged-alert level, e.g. blue, yellow etc.
         cap_limit: capacity of a hospital recourse. e.g. ICU or general ward capacity.
-
+        legend: list of legend labels for the background colors.
         Returns None
         """
         bottom_tier = 0
@@ -349,11 +385,40 @@ class Plot:
                                bottom=bottom_tier,
                                width=1,
                                alpha=0.6,
-                               linewidth=0)
+                               linewidth=0,
+                               label=legend[u] if legend is not None else None)
             bottom_tier += np.array(color_fill)
+
+        if tier_history2 is not None:
+            bottom_tier2 = 0
+            for u in range(len(tier_colors2)):
+                color_fill2 = (sum(np.array(t[policy_start_date:self.T]) == u for t in tier_history2)
+                               / (len(tier_history2) - policy_start_date)) * self.y_lim[self.var]
+
+                self.actions_ax.bar(range(policy_start_date, self.T),
+                                    color_fill2,
+                                    color=tier_colors2[u],
+                                    bottom=bottom_tier2,
+                                    width=1,
+                                    alpha=0.6,
+                                    linewidth=0)
+                bottom_tier2 += np.array(color_fill2)
 
         # Plot a horizontal black line to indicate the resource capacity:
         self.ax1.hlines(cap_limit, 0, self.T, colors='k', linewidth=3)
+
+        # Plot legends if the labels are provided:
+        if legend is not None:
+            lines, labels = self.policy_ax.get_legend_handles_labels()
+            label_line_dict = {label: line for label, line in zip(labels, lines)}
+
+            unique_labels = list(label_line_dict.keys())
+            unique_lines = list(label_line_dict.values())
+
+            unique_labels = [unique_labels[1], unique_labels[2], unique_labels[-1], unique_labels[-2]]
+            unique_lines = [unique_lines[1], unique_lines[2], unique_lines[-1], unique_lines[-2]]
+
+            self.policy_ax.legend(unique_lines, unique_labels, loc="upper left", fontsize="15")
         self.save_plot("dali")
 
 
@@ -482,7 +547,7 @@ class BarPlot:
         self.ax2.legend(unique_lines, unique_labels, loc="upper right", fontsize="15")
 
     def save_to_file(self):
-        plot_filename = self.path_to_plot / f"{self.instance.city}_{self.plot_info['plot_name']}_bar_plot.pdf"
+        plot_filename = self.path_to_plot / f"{self.instance.city}_{self.plot_info['plot_name']}_bar_plot.png"
         plt.tight_layout()
         plt.subplots_adjust(hspace=0)
         plt.savefig(plot_filename)

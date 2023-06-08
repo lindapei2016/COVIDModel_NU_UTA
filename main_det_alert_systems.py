@@ -69,7 +69,8 @@ simulation_end_time = dt.datetime(2020, 10, 1)
 # Define the deterministic simulation with CDC system, you can define for Austin system with mtp object:
 seed = -1
 rep = SimReplication(austin, vaccines, ctp, seed)
-rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time), austin.cal.calendar.index(history_end_time))
+rep.fixed_kappa_end_date = austin.cal.calendar.index(history_end_time)
+rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time))
 
 # Save the simulation output to files. (I have my own directory /input_output_folder/austin for storing the files)
 # Check if the directory exists:
