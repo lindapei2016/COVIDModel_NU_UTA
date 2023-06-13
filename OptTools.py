@@ -303,10 +303,22 @@ def evaluate_one_policy_one_sample_path(
         the time at which the sample paths stopped
     '''
     sim_rep.policy = policy
+
+    start_time = sim_rep.next_t
+
     sim_rep.simulate_time_period(end_time)
+
     cost = sim_rep.compute_cost()
     feasibility = sim_rep.compute_feasibility()
-    return cost, feasibility
+
+    stage1_days = np.sum(np.array(sim_rep.policy.tier_history) == 0)
+    stage2_days = np.sum(np.array(sim_rep.policy.tier_history) == 1)
+    stage3_days = np.sum(np.array(sim_rep.policy.tier_history) == 2)
+
+    ICU_difference = np.array(sim_rep.ICU_history).sum(axis=(1, 2)) - sim_rep.instance.icu
+    ICU_violation_patient_days = np.sum(ICU_difference[ICU_difference >= 0])
+
+    return cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days
 
 
 ###############################################################################
