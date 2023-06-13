@@ -94,7 +94,7 @@ class CDCTierPolicy:
         self.active_indicator_history = []
 
     def __repr__(self):
-        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds['non_surge']}_{self.staffed_bed_thresholds['non_surge']}"
+        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds['non_surge'][0]}_{self.staffed_bed_thresholds['non_surge'][0]}_{self.percentage_cases}"
 
     def __call__(self, t, ToIHT, IH, ToIY, ICU):
         N = self._instance.N

@@ -30,7 +30,6 @@ surge_colors = ['moccasin', 'pink']
 
 def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_thresholds, policy_name, tier_colors,
                    storage_folder_name):
-
     # Read the simulation outputs:
     sim_outputs, policy_outputs = import_stoch_reps_for_reporting(seeds, num_reps, real_history_end_date, instance,
                                                                   policy_name, storage_folder_name)
@@ -75,10 +74,29 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
                 # a certain  CDC  indicator is active, e.g., prescribe a higher stage-alert level.
                 # Turquoise color indicates hospital admission and percent of staffed bed indicators
                 # prescribe the same alert level.
+                indicator_hist = []
+                for i, ind_hist in enumerate(policy_outputs["active_indicator_history"]):
+                    temp_hist = [h if policy_outputs["surge_history"][i][j] == 0 or h is None else h + 3
+                                 for j, h in enumerate(ind_hist)]
+                    indicator_hist.append(temp_hist)
+
                 plot = Plot(instance, real_history_end_date, real_data, val, f"{key}_sum", policy_name, central_path_id,
                             color=('k', 'silver'))
-                plot.dali_plot(policy_outputs["active_indicator_history"],
-                               ["cornflowerblue", "navy", "turquoise"])
+                # plot.dali_plot(indicator_hist,
+                #                ["blue", "navy", "turquoise", "yellow", "skyblue", "purple"])
+                legend = ["hosp. adm (case count low)",
+                          "staffed bed (case count low)",
+                          "both (case count low)",
+                          "hosp. adm (case count high)",
+                          "staffed bed (case count high)",
+                          "both (case count high)"]
+
+                plot.dali_plot(indicator_hist,
+                               ["tab:red", "tab:blue", "tab:green", "tab:pink", "tab:orange", "tab:purple"],
+                               0,
+                               legend,
+                               [policy_outputs["tier_history"][central_path_id]],
+                               tier_colors)
 
                 active_ind_given_red = []
                 for i, hist in enumerate(policy_outputs["active_indicator_history"]):
@@ -126,23 +144,23 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
             plot.vertical_plot(policy_outputs["surge_history"], surge_colors, policy_outputs["case_threshold"])
             plot.dali_plot(policy_outputs["surge_history"], surge_colors, policy_outputs["case_threshold"])
 
-        # The remaining plots are useful during parameter fitting:
-        # elif key == "D_history":
-        #     real_data = np.cumsum(
-        #         np.array([ai + bi for (ai, bi) in zip(instance.real_ToIYD_history, instance.real_ToICUD_history)]))
-        #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
-        #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
-        # elif key == "ToIYD_history":
-        #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
-        #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
-        # elif key == "ToICUD_history":
-        #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
-        #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
-        # elif key == "S_history":
-        #     real_data = None
-        #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name,
-        #                 central_path_id)
-        #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
+#         # The remaining plots are useful during parameter fitting:
+#         # elif key == "D_history":
+#         #     real_data = np.cumsum(
+#         #         np.array([ai + bi for (ai, bi) in zip(instance.real_ToIYD_history, instance.real_ToICUD_history)]))
+#         #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
+#         #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
+#         # elif key == "ToIYD_history":
+#         #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
+#         #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
+#         # elif key == "ToICUD_history":
+#         #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
+#         #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
+#         # elif key == "S_history":
+#         #     real_data = None
+#         #     plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name,
+#         #                 central_path_id)
+#         #     plot.vertical_plot(policy_outputs["tier_history"], tier_colors)
 
 
 def report_from_file(seeds, num_reps, instance, history_end_date, stats_end_date, policy_name, tier_colors,

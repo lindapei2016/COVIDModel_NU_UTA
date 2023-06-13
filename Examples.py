@@ -71,7 +71,7 @@ austin = City("austin",
               "austin_hospital_home_timeseries.csv",
               "variant_prevalence.csv")
 
-tiers = TierInfo("austin", "tiers5_opt_Final.json")
+tiers = TierInfo("austin", "tiers4.json")
 
 vaccines = Vaccine(austin,
                    "austin",

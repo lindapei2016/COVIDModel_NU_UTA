@@ -2,25 +2,16 @@
     "tiers": [
     {
         "name": "Stage 1",
-        "transmission_reduction": 0,
-        "cocooning": 0,
-        "school_closure": 0,
-        "min_enforcing_time": 1,
-        "daily_cost": 0,
-        "color": "green"
-    },  
-    {
-        "name": "Stage 2",
-        "transmission_reduction":  0.575,
-        "cocooning":  0.575,
+        "transmission_reduction":  0.48875,
+        "cocooning":  0.48875,
         "school_closure": 0,
         "min_enforcing_time": 1,
         "daily_cost": 1,
         "color": "blue"
     },
     {
-        "name": "Stage 3",
-        "transmission_reduction": 0.65,
+        "name": "Stage 2",
+        "transmission_reduction": 0.5525,
         "cocooning": 0.65,
         "school_closure": 0,
         "min_enforcing_time": 1,
@@ -28,18 +19,18 @@
         "color": "yellow"
     },
     {
-        "name": "Stage 4",
-        "transmission_reduction": 0.725,
-        "cocooning": 0.725,
+        "name": "Stage 3",
+        "transmission_reduction": 0.61625,
+        "cocooning": 0.61625,
         "school_closure": 0,
         "min_enforcing_time": 1,
         "daily_cost": 100,
         "color": "orange"
     },
     {
-        "name": "Stage 5",
-        "transmission_reduction": 0.80,
-        "cocooning": 0.80,
+        "name": "Stage 4",
+        "transmission_reduction": 0.68,
+        "cocooning": 0.68,
         "school_closure": 1,
         "min_enforcing_time": 1,
         "daily_cost": 10000,

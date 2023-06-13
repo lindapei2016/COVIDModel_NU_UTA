@@ -147,7 +147,7 @@ historic_stages_cdc = HistoricalStages(austin,
                                        real_ToIY,
                                        ctp)
 
-historic_stages_cdc .create_historic_stages()
+historic_stages_cdc.create_historic_stages()
 
 policy_name_ctp = f"CDC_{case_threshold}"
 redundant_data = [np.array([np.zeros((5, 2)) for t in range(len(austin.real_ToIHT_history))])]
@@ -161,11 +161,11 @@ with open(policy_filename) as file:
 
 plot = Plot(austin, history_end_time, austin.real_ToIHT_history, redundant_data, "ToIHT_history_sum", policy_name_ctp, 0,
             color=('k', 'silver'))
-plot.vertical_plot([data["tier_history"]], tier_colors_ctp, 1100)
+# plot.vertical_plot([data["tier_history"]], tier_colors_ctp, 1100)
 
 ######################################################################################
-tiers = TierInfo("austin", "tiers5_opt_Final.json")
-thresholds = (-1, 0, 15, 25, 50)
+tiers = TierInfo("austin", "tiers4.json")
+thresholds = (-1, 15, 25, 50)
 mtp = MultiTierPolicy(austin, tiers, thresholds, "green")
 historic_stages_austin = HistoricalStages(austin,
                                           tiers.tier,
@@ -187,4 +187,16 @@ with open(policy_filename) as file:
 
 plot = Plot(austin, history_end_time, austin.real_ToIHT_history, redundant_data, "ToIHT_history_sum", str(mtp), 0,
             color=('k', 'silver'))
-plot.vertical_plot([data["tier_history"]], tier_colors_mtp, 1100)
+# plot.vertical_plot([data["tier_history"]], tier_colors_mtp, 1100)
+
+filename = f"{base_path}/instances/austin/austin_historical_stages.csv"
+austin_historic_stages = pd.read_csv(
+            str(filename),
+            parse_dates=["date"],
+            date_parser=pd.to_datetime,
+        )
+
+plot = Plot(austin, history_end_time, austin.real_ToIHT_history, redundant_data, "ToIHT_history_sum", str(mtp), 0,
+            color=('k', 'silver'))
+stages = [int(a) if a != "None" else None for a in austin_historic_stages["stage"].values]
+plot.vertical_plot([stages], tier_colors_mtp, 1100)

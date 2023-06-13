@@ -44,7 +44,7 @@ vaccines = Vaccine(
 # tiers file contains the staged-alert levels with the corresponding transmission reductions:
 # CDC system has three levels and Austin system has four levels.
 tiers_CDC = TierInfo("austin", "tiers_CDC.json")
-tiers_austin = TierInfo("austin", "tiers5_opt_Final.json")
+tiers_austin = TierInfo("austin", "tiers4.json")
 
 # Define the threshold values for each indicator:
 thresholds_austin = (-1, 0, 15, 25, 50)  # Austin's system has one indicator.
@@ -69,7 +69,8 @@ simulation_end_time = dt.datetime(2020, 10, 1)
 # Define the deterministic simulation with CDC system, you can define for Austin system with mtp object:
 seed = -1
 rep = SimReplication(austin, vaccines, ctp, seed)
-rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time), austin.cal.calendar.index(history_end_time))
+rep.fixed_kappa_end_date = austin.cal.calendar.index(history_end_time)
+rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time))
 
 # Save the simulation output to files. (I have my own directory /input_output_folder/austin for storing the files)
 # Check if the directory exists:
