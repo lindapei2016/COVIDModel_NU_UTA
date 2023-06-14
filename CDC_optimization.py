@@ -6,7 +6,7 @@
 #   and evaluation of CDC policies. User can specify which CDC policies
 #   they would like to evaluate.
 # Can split up sample path generation and policy evaluation on
-#   parallel processors using mpi4py.
+#   parallel processors using ''mpi4py.''
 # The number of sample paths generated (and number of replications
 #   that each policy is evaluated on) is
 #       total_num_processors x sample_paths_generated_per_processor
@@ -19,7 +19,7 @@
 ###############################################################################
 
 import copy
-from SimObjects import MultiTierPolicy, CDCTierPolicy
+from SimObjects import CDCTierPolicy
 from DataObjects import City, TierInfo, Vaccine
 from SimModel import SimReplication
 import InputOutputTools
@@ -29,7 +29,6 @@ import pandas as pd
 
 # Import other Python packages
 import numpy as np
-import time
 import glob
 
 from mpi4py import MPI
@@ -54,7 +53,8 @@ austin = City("austin",
               "austin_hospital_home_timeseries.csv",
               "variant_prevalence.csv")
 
-tiers = TierInfo("austin", "tiers_CDC.json")
+pre_vaccine_tiers = TierInfo("austin", "tiers_CDC.json")
+post_vaccine_tiers = TierInfo("austin", "tiers_CDC_reduced_values.json")
 
 vaccines = Vaccine(austin,
                    "austin",
@@ -68,19 +68,14 @@ vaccines = Vaccine(austin,
 # Toggle True/False or specify values for customization
 
 # Change to False if sample paths have already been generated
-#   and we just need to do evaluation
 need_sample_paths = False
 sample_paths_generated_per_processor = 1
 
-# Change to False if also varying hospital admissions thresholds
-vary_staffed_thresholds_only = False
-
 # Change to False if evaluation is already done
-#   and we just need to do parsing
-need_evaluation = False
+need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 2
+num_reps_evaluated_per_policy = 100
 
 # Reps offset
 # Rep number to start on
@@ -124,7 +119,6 @@ if need_sample_paths:
     if rank == 0:
         print("Sample path generation completed.")
 
-
 ###############################################################################
 
 # Step 2: create list of policy objects
@@ -135,19 +129,30 @@ if need_sample_paths:
 #   and increment from that point until 30 or 40 per 100k
 # upper bound of 60% occupancy would suffice
 
-if vary_staffed_thresholds_only:
-    case_threshold = 200
-    hosp_adm_thresholds = {"non_surge": (10, 20, 20), "surge": (-1, 10, 10)}
-    # staffed_thresholds = {"non_surge": (-1, -1, 0.1, 0.15, 0.15), "surge": (-1, -1, -1, 0.1, 0.1)}
+case_threshold = 200
 
-    policies = []
+pre_vaccine_policies = []
+post_vaccine_policies = []
 
-    # This creates only 35 policies with tuples (0.1, 0.6, 0.1)
-    # Changing the relevant tuple to (0.05, 0.5, 0.05) creates 165 policies
-    non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-                                                                       (0.05, 0.5, 0.05),
-                                                                       (0.05, 0.5, 0.05),
-                                                                       (0.05, 0.5, 0.05))
+# This creates 1296 policies
+non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
+                                                                   (-1, 0, 1),
+                                                                   (0, 0.4, 0.05),
+                                                                   (0, 0.4, 0.05))
+
+non_surge_hosp_adm_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
+                                                                    (-1, 0, 1),
+                                                                    (0, 40, 5),
+                                                                    (0, 40, 5))
+
+for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+
+    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                         non_surge_hosp_adm_thresholds[3],
+                                         non_surge_hosp_adm_thresholds[4]),
+                           "surge": (-1,
+                                     non_surge_hosp_adm_thresholds[2],
+                                     non_surge_hosp_adm_thresholds[2])}
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
@@ -156,63 +161,21 @@ if vary_staffed_thresholds_only:
                               "surge": (-1,
                                         non_surge_staffed_thresholds[2],
                                         non_surge_staffed_thresholds[2])}
-        policy = CDCTierPolicy(austin,
-                               tiers,
-                               case_threshold,
-                               hosp_adm_thresholds,
-                               staffed_thresholds)
-        policies.append(policy)
-else:
-    case_threshold = 200
+        pre_vaccine_policy = CDCTierPolicy(austin,
+                                           pre_vaccine_tiers,
+                                           case_threshold,
+                                           hosp_adm_thresholds,
+                                           staffed_thresholds)
 
-    policies = []
+        post_vaccine_policy = CDCTierPolicy(austin,
+                                            post_vaccine_tiers,
+                                            case_threshold,
+                                            hosp_adm_thresholds,
+                                            staffed_thresholds)
+        pre_vaccine_policies.append(pre_vaccine_policy)
+        post_vaccine_policies.append(post_vaccine_policy)
 
-    # This creates 1650 policies
-    # non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-    #                                                                    (0.05, 0.5, 0.05),
-    #                                                                    (0.05, 0.5, 0.05),
-    #                                                                    (0.05, 0.5, 0.05))
-    #
-    # non_surge_hosp_adm_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-    #                                                                     (10, 40, 10),
-    #                                                                     (10, 40, 10),
-    #                                                                     (10, 40, 10))
-
-    # This creates 840 policies
-    non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-                                                                       (0.05, 0.4, 0.05),
-                                                                       (0.05, 0.4, 0.05),
-                                                                       (0.05, 0.4, 0.05))
-
-    non_surge_hosp_adm_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-                                                                        (10, 40, 10),
-                                                                        (10, 40, 10),
-                                                                        (10, 40, 10))
-
-    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                             non_surge_hosp_adm_thresholds[3],
-                                             non_surge_hosp_adm_thresholds[4]),
-                               "surge": (-1,
-                                         non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[2])}
-
-        for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-            staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                                non_surge_staffed_thresholds[3],
-                                                non_surge_staffed_thresholds[4]),
-                                  "surge": (-1,
-                                            non_surge_staffed_thresholds[2],
-                                            non_surge_staffed_thresholds[2])}
-            policy = CDCTierPolicy(austin,
-                                   tiers,
-                                   case_threshold,
-                                   hosp_adm_thresholds,
-                                   staffed_thresholds)
-            policies.append(policy)
-
-# print(len(policies))
+# print(len(pre_vaccine_policies))
 # breakpoint()
 
 ###############################################################################
@@ -251,7 +214,7 @@ if need_evaluation:
 # Step 4: split policies amongst processors and create RNG for each processor
 # Some processors have base_assignment
 # Others have base_assignment + 1
-num_policies = len(policies)
+num_policies = len(pre_vaccine_policies)
 base_assignment = int(np.floor(num_policies / total_num_processors))
 leftover = num_policies % total_num_processors
 
@@ -281,7 +244,11 @@ if need_evaluation:
 
         for policy_id in policy_ids_to_evaluate:
 
-            policy = policies[policy_id]
+            if peak == 0 or peak == 1:
+                policy = pre_vaccine_policies[policy_id]
+            else:
+                policy = post_vaccine_policies[policy_id]
+
             cost_per_rep = []
             feasibility_per_rep = []
             stage1_days_per_rep = []
@@ -341,7 +308,7 @@ if need_evaluation:
 
 # Create 2 sets of dataframes
 # Set A: 1 dataframe for each policy -- columns are cost, feasibility,
-#   ICU patient days violation, stage1 days, stage2 days, stage3 days
+#   ICU patient-days violation, stage1 days, stage2 days, stage3 days
 #   (each of the 6 performance measures), rows are replications
 # Set B: 1 dataframe for each performance measure, -- columns are
 #   policies, rows are replications
@@ -418,4 +385,5 @@ if need_parse:
         # Generate and export Set B dataframes
         for performance_measures_id in range(num_performance_measures):
             df = pd.DataFrame(performance_measures_dicts[performance_measures_id])
-            df.to_csv("aggregated_peak" + str(peak) + "_" + str(performance_measures_strs[performance_measures_id]) + ".csv")
+            df.to_csv(
+                "aggregated_peak" + str(peak) + "_" + str(performance_measures_strs[performance_measures_id]) + ".csv")
