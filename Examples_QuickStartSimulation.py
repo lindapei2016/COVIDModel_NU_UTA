@@ -1,11 +1,11 @@
 ###############################################################################
 
-# Examples.py
+# Examples_QuickStartSimulation.py
 # This document contains examples of how to use the simulation code.
 
 # To launch the examples, either
 # (1) Run the following command in the OS command line or Terminal:
-#   python3 Examples.py
+#   python3 Examples_QuickStartSimulation.py
 # (2) Copy and paste the code of this document into an interactive
 #   Python console.
 
@@ -37,14 +37,14 @@
 # InputOutputTools contains utility functions that act on
 #   instances of SimReplication to load and export
 #   simulation states and data.
-# OptTools contains utility functions for optimization purposes.
+# Tools_Optimization contains utility functions for optimization purposes.
 
 import copy
-from SimObjects import MultiTierPolicy, CDCTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from SimModel import SimReplication
-import InputOutputTools
-import OptTools
+from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Engine_SimModel import SimReplication
+import Tools_InputOutput
+import Tools_Optimization
 
 # Import other Python packages
 import numpy as np
@@ -282,7 +282,7 @@ rep.simulate_time_period(800)
 #   sampled in the EpiSetup object.
 # These files will save in the same directory as the
 #   main .py file.
-InputOutputTools.export_rep_to_json(rep, "sim_rep.json",
+Tools_InputOutput.export_rep_to_json(rep, "sim_rep.json",
                                     "v0.json", "v1.json", "v2.json", "v3.json",
                                     "policy.json", "random_params.json")
 
@@ -292,7 +292,7 @@ InputOutputTools.export_rep_to_json(rep, "sim_rep.json",
 # These files are currently in the same directory as the main .py file.
 # Note the line about rep.rng -- we will explain this later.
 rep = SimReplication(austin, vaccines, mtp, 1000)
-InputOutputTools.import_rep_from_json(rep, "sim_rep.json",
+Tools_InputOutput.import_rep_from_json(rep, "sim_rep.json",
                                       "v0.json", "v1.json", "v2.json", "v3.json",
                                       "policy.json", "random_params.json")
 # rep.epi_rand.setup_base_params()
@@ -363,6 +363,6 @@ rep = SimReplication(austin, vaccines, ctp, -1)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 # Example D: Parameter fitting
-# Check out param_fitting_example.py script.
+# Check out Examples_Fitting.py script.
 
 

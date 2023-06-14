@@ -13,11 +13,11 @@ import time
 
 import copy
 
-from SimObjects import MultiTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from SimModel import SimReplication
-from InputOutputTools import import_rep_from_json, export_rep_to_json
-from OptTools import get_sample_paths, thresholds_generator, \
+from Engine_SimObjects import MultiTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Engine_SimModel import SimReplication
+from Tools_InputOutput import import_rep_from_json, export_rep_to_json
+from Tools_Optimization import get_sample_paths, thresholds_generator, \
     evaluate_policies_on_sample_paths, evaluate_single_policy_on_sample_path
 
 from pathlib import Path

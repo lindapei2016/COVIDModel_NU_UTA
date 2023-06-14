@@ -1,17 +1,16 @@
 ###############################################################################
-# main_det_alert_systems.py
+# Examples_RetrospectiveDeterministic.py
 # This script contains examples of how to run plot various plots.
 
 # Nazlican Arslan 2023
 ###############################################################################
 
-from SimObjects import MultiTierPolicy, CDCTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from SimModel import SimReplication
-from InputOutputTools import export_rep_to_json
-from Plotting import plot_from_file
-from InputOutputTools import import_stoch_reps_for_reporting
-from Plot_Manager import Plot, find_central_path, BarPlot
+from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Engine_SimModel import SimReplication
+from Tools_InputOutput import export_rep_to_json
+from Tools_InputOutput import import_stoch_reps_for_reporting
+from Tools_Plot import Plot, find_central_path, BarPlot, plot_from_file
 
 # Import other Python packages
 import datetime as dt
@@ -19,7 +18,7 @@ from pathlib import Path
 import os
 
 # Let's first run a deterministic sample path with Austin's staged-alert system.
-# The beginning is similar to main_det_alert_systems.py. You can skip to the plotting part.
+# The beginning is similar to Examples_RetrospectiveDeterministic.py. You can skip to the plotting part.
 
 base_path = Path(__file__).parent
 ###############################################################################

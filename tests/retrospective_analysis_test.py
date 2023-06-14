@@ -4,12 +4,12 @@
 # Nazlican Arslan 2023
 ###############################################################################
 
-from SimObjects import MultiTierPolicy, CDCTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from SimModel import SimReplication
-from OptTools import evaluate_single_policy_on_sample_path, get_sample_paths
-from InputOutputTools import export_rep_to_json
-from Plotting import plot_from_file
+from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Engine_SimModel import SimReplication
+from Tools_Optimization import evaluate_single_policy_on_sample_path, get_sample_paths
+from Tools_InputOutput import export_rep_to_json
+from Tools_Plot import plot_from_file
 
 # Import other Python packages
 import datetime as dt
