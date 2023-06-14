@@ -1,20 +1,20 @@
 ###############################################################################
-# main_stoch_alert_systems.py
+# Examples_RetrospectiveStochastic.py
 # This script contains examples of how to run the stochastic simulation
 # for retrospective staged-alert system evaluation.
 
 # Nazlican Arslan 2023
 ###############################################################################
 
-from SimObjects import MultiTierPolicy, CDCTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from OptTools import evaluate_single_policy_on_sample_path, get_sample_paths
-from Plotting import plot_from_file, report_from_file, bar_plot_from_file
+from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Tools_Optimization import evaluate_single_policy_on_sample_path, get_sample_paths
+from Tools_Plot import plot_from_file, report_from_file, bar_plot_from_file
 
 import datetime as dt
 import multiprocessing as mp
 import numpy as np
-from SimModel import SimReplication
+from Engine_SimModel import SimReplication
 
 ###############################################################################
 # Create a city object:

@@ -6,10 +6,10 @@
 # Nazlican Arslan, 2023
 ######################################################################################
 
-from SimObjects import find_tier
-from DataObjects import City, TierInfo
-from Plot_Manager import Plot
-from SimObjects import CDCTierPolicy, MultiTierPolicy
+from Engine_SimObjects import find_tier
+from Engine_DataObjects import City, TierInfo
+from Tools_Plot import Plot
+from Engine_SimObjects import CDCTierPolicy, MultiTierPolicy
 
 import numpy as np
 import pandas as pd

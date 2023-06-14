@@ -1,6 +1,6 @@
 ###############################################################################
 
-# CDC_optimization.py
+# Script_CDCRetrospectiveOptimization.py
 
 # This script contains beginning-to-end sample path generation
 #   and evaluation of CDC policies. User can specify which CDC policies
@@ -19,11 +19,11 @@
 ###############################################################################
 
 import copy
-from SimObjects import CDCTierPolicy
-from DataObjects import City, TierInfo, Vaccine
-from SimModel import SimReplication
-import InputOutputTools
-import OptTools
+from Engine_SimObjects import CDCTierPolicy
+from Engine_DataObjects import City, TierInfo, Vaccine
+from Engine_SimModel import SimReplication
+import Tools_InputOutput
+import Tools_Optimization
 
 import pandas as pd
 
@@ -99,15 +99,15 @@ need_parse = True
 # Timepoints corresponding to 93, 276, 502, and 641 correspond to
 #   start of 4 peaks
 if need_sample_paths:
-    OptTools.get_sample_paths(austin,
-                              vaccines,
-                              0.75,
-                              sample_paths_generated_per_processor,
-                              timepoints=(25, 93, 276, 502, 641),
-                              processor_rank=rank,
-                              save_intermediate_states=True,
-                              storage_folder_name="states",
-                              fixed_kappa_end_date=763)
+    Tools_Optimization.get_sample_paths(austin,
+                                        vaccines,
+                                        0.75,
+                                        sample_paths_generated_per_processor,
+                                        timepoints=(25, 93, 276, 502, 641),
+                                        processor_rank=rank,
+                                        save_intermediate_states=True,
+                                        storage_folder_name="states",
+                                        fixed_kappa_end_date=763)
 
     # Force synchronization step so that all sample paths actually exist
     #   before evaluation begins
@@ -135,15 +135,15 @@ pre_vaccine_policies = []
 post_vaccine_policies = []
 
 # This creates 1296 policies
-non_surge_staffed_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
+non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
                                                                    (-1, 0, 1),
                                                                    (0, 0.4, 0.05),
                                                                    (0, 0.4, 0.05))
 
-non_surge_hosp_adm_thresholds_array = OptTools.thresholds_generator((-1, 0, 1),
-                                                                    (-1, 0, 1),
-                                                                    (0, 40, 5),
-                                                                    (0, 40, 5))
+non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                              (-1, 0, 1),
+                                                                              (0, 40, 5),
+                                                                              (0, 40, 5))
 
 for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
@@ -196,14 +196,14 @@ if need_evaluation:
                 # Create a rep with no policy attached
                 # Will edit the random number generator later, so seed does not matter
                 rep = SimReplication(austin, vaccines, None, 1000)
-                InputOutputTools.import_rep_from_json(rep,
-                                                      base_path / "states" / (prefix + "sim.json"),
-                                                      base_path / "states" / (prefix + "v0.json"),
-                                                      base_path / "states" / (prefix + "v1.json"),
-                                                      base_path / "states" / (prefix + "v2.json"),
-                                                      base_path / "states" / (prefix + "v3.json"),
-                                                      None,
-                                                      base_path / "states" / (prefix + "epi_params.json"))
+                Tools_InputOutput.import_rep_from_json(rep,
+                                                       base_path / "states" / (prefix + "sim.json"),
+                                                       base_path / "states" / (prefix + "v0.json"),
+                                                       base_path / "states" / (prefix + "v1.json"),
+                                                       base_path / "states" / (prefix + "v2.json"),
+                                                       base_path / "states" / (prefix + "v3.json"),
+                                                       None,
+                                                       base_path / "states" / (prefix + "epi_params.json"))
                 reps.append(rep)
             if len(reps) >= num_reps_evaluated_per_policy + reps_offset:
                 break
@@ -274,7 +274,7 @@ if need_evaluation:
                 new_rep.rng = np.random.Generator(bit_generator)
 
                 cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days \
-                    = OptTools.evaluate_one_policy_one_sample_path(policy, new_rep, end_time)
+                    = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time)
                 cost_per_rep.append(cost)
                 feasibility_per_rep.append(feasibility)
                 stage1_days_per_rep.append(stage1_days)
