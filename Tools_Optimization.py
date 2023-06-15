@@ -304,6 +304,7 @@ def evaluate_one_policy_one_sample_path(
     sim_rep.policy = policy
 
     start_time = sim_rep.next_t
+    sim_rep.fixed_kappa_end_date = start_time
 
     sim_rep.simulate_time_period(end_time)
 
@@ -317,7 +318,9 @@ def evaluate_one_policy_one_sample_path(
     ICU_difference = np.array(sim_rep.ICU_history).sum(axis=(1, 2)) - sim_rep.instance.icu
     ICU_violation_patient_days = np.sum(ICU_difference[ICU_difference >= 0])
 
-    return cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days
+    surge_days = np.sum([i for i in sim_rep.policy.surge_history if i is not None])
+
+    return cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days, surge_days
 
 
 ###############################################################################

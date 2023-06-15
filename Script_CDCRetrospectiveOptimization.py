@@ -75,7 +75,7 @@ sample_paths_generated_per_processor = 1
 need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 100
+num_reps_evaluated_per_policy = 20
 
 # Reps offset
 # Rep number to start on
@@ -88,6 +88,9 @@ split_peaks_amongst_processors = True
 
 # Change to True if also want to automatically parse files
 need_parse = True
+
+# If True, only test 2 policies
+using_test_set_only = False
 
 ###############################################################################
 
@@ -151,22 +154,21 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                          non_surge_hosp_adm_thresholds[3],
                                          non_surge_hosp_adm_thresholds[4]),
                            "surge": (-1,
-                                     non_surge_hosp_adm_thresholds[2],
-                                     non_surge_hosp_adm_thresholds[2])}
+                                     non_surge_hosp_adm_thresholds[3],
+                                     non_surge_hosp_adm_thresholds[3])}
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
                                             non_surge_staffed_thresholds[3],
                                             non_surge_staffed_thresholds[4]),
                               "surge": (-1,
-                                        non_surge_staffed_thresholds[2],
-                                        non_surge_staffed_thresholds[2])}
+                                        non_surge_staffed_thresholds[3],
+                                        non_surge_staffed_thresholds[3])}
         pre_vaccine_policy = CDCTierPolicy(austin,
                                            pre_vaccine_tiers,
                                            case_threshold,
                                            hosp_adm_thresholds,
                                            staffed_thresholds)
-
         post_vaccine_policy = CDCTierPolicy(austin,
                                             post_vaccine_tiers,
                                             case_threshold,
@@ -174,6 +176,10 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                             staffed_thresholds)
         pre_vaccine_policies.append(pre_vaccine_policy)
         post_vaccine_policies.append(post_vaccine_policy)
+
+if using_test_set_only:
+    pre_vaccine_policies = pre_vaccine_policies[:2]
+    post_vaccine_policies = post_vaccine_policies[:2]
 
 # print(len(pre_vaccine_policies))
 # breakpoint()
@@ -255,6 +261,7 @@ if need_evaluation:
             stage2_days_per_rep = []
             stage3_days_per_rep = []
             ICU_violation_patient_days_per_rep = []
+            surge_days_per_rep = []
 
             rep_counter = 0
 
@@ -273,7 +280,7 @@ if need_evaluation:
                 new_rep.policy = policy
                 new_rep.rng = np.random.Generator(bit_generator)
 
-                cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days \
+                cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days, surge_days \
                     = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time)
                 cost_per_rep.append(cost)
                 feasibility_per_rep.append(feasibility)
@@ -281,6 +288,7 @@ if need_evaluation:
                 stage2_days_per_rep.append(stage2_days)
                 stage3_days_per_rep.append(stage3_days)
                 ICU_violation_patient_days_per_rep.append(ICU_violation_patient_days)
+                surge_days_per_rep.append(surge_days)
 
                 policy.reset()
 
@@ -298,6 +306,8 @@ if need_evaluation:
                                np.array(stage3_days_per_rep), delimiter=",")
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_ICU_violation_patient_days.csv",
                                np.array(ICU_violation_patient_days_per_rep), delimiter=",")
+                    np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "surge_days.csv",
+                               np.array(surge_days_per_rep), delimiter=",")
     comm.Barrier()
     if rank == 0:
         print("Evaluation completed.")
@@ -341,9 +351,10 @@ if need_parse:
         stage1_days_dict = {}
         stage2_days_dict = {}
         stage3_days_dict = {}
+        surge_days_dict = {}
 
         performance_measures_dicts = [cost_dict, feasibility_dict, ICU_violation_patient_days_dict,
-                                      stage1_days_dict, stage2_days_dict, stage3_days_dict]
+                                      stage1_days_dict, stage2_days_dict, stage3_days_dict, surge_days_dict]
 
         cost_filenames = glob.glob("peak" + str(peak) + "*cost.csv")
         feasibility_filenames = glob.glob("peak" + str(peak) + "*feasibility.csv")
@@ -351,15 +362,17 @@ if need_parse:
         stage1_days_filenames = glob.glob("peak" + str(peak) + "*stage1_days.csv")
         stage2_days_filenames = glob.glob("peak" + str(peak) + "*stage2_days.csv")
         stage3_days_filenames = glob.glob("peak" + str(peak) + "*stage3_days.csv")
+        surge_days_filenames = glob.glob("peak" + str(peak) + "*surge_days.csv")
 
-        num_performance_measures = 6
+        num_performance_measures = len(performance_measures_dicts)
 
         performance_measures_filenames = [cost_filenames, feasibility_filenames, ICU_violation_patient_days_filenames,
-                                          stage1_days_filenames, stage2_days_filenames, stage3_days_filenames]
+                                          stage1_days_filenames, stage2_days_filenames, stage3_days_filenames,
+                                          surge_days_filenames]
 
         # These become the column names for dataframes in Set A
         performance_measures_strs = ["cost", "feasibility", "icu_violation_patient_days",
-                                     "stage1_days", "stage2_days", "stage3_days"]
+                                     "stage1_days", "stage2_days", "stage3_days", "surge_days"]
 
         # Open each .csv file and store its contents in various dataframes
         for performance_measures_id in range(num_performance_measures):
