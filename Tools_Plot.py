@@ -1,3 +1,6 @@
+# Plots will be saved in folder called "plots" in current working directory
+# If such a folder does not exist, the code will automaticallyc reate one
+
 from matplotlib import pyplot as plt, colors
 from pathlib import Path
 import numpy as np
@@ -5,6 +8,7 @@ from datetime import datetime as dt
 import calendar as py_cal
 import json
 import pandas as pd
+import os
 
 from Tools_InputOutput import import_stoch_reps_for_reporting
 from Tools_Report import sim_history_key_stats, Report
@@ -13,14 +17,18 @@ base_path = Path(__file__).parent
 path_to_plot = base_path / "plots"
 real_data_file_names = {}
 
+directory_exists = os.path.exists(path_to_plot)
+if not directory_exists:
+    os.makedirs(path_to_plot)
+
 surge_colors = ('moccasin', 'pink')
 
 plt.rcParams["font.size"] = "18"
 
 
 ######################################################################################
-# Plotting Module
 
+# Plotting Module
 
 def find_central_path(sim_data_ICU, sim_data_IH, real_data, T_real: int):
     # Trim real data to T_real time steps

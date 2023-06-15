@@ -75,7 +75,7 @@ sample_paths_generated_per_processor = 1
 need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 20
+num_reps_evaluated_per_policy = 100
 
 # Reps offset
 # Rep number to start on
@@ -154,7 +154,7 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                          non_surge_hosp_adm_thresholds[3],
                                          non_surge_hosp_adm_thresholds[4]),
                            "surge": (-1,
-                                     non_surge_hosp_adm_thresholds[3],
+                                     -1,
                                      non_surge_hosp_adm_thresholds[3])}
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
@@ -162,7 +162,7 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                             non_surge_staffed_thresholds[3],
                                             non_surge_staffed_thresholds[4]),
                               "surge": (-1,
-                                        non_surge_staffed_thresholds[3],
+                                        -1,
                                         non_surge_staffed_thresholds[3])}
         pre_vaccine_policy = CDCTierPolicy(austin,
                                            pre_vaccine_tiers,
@@ -306,7 +306,7 @@ if need_evaluation:
                                np.array(stage3_days_per_rep), delimiter=",")
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_ICU_violation_patient_days.csv",
                                np.array(ICU_violation_patient_days_per_rep), delimiter=",")
-                    np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "surge_days.csv",
+                    np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_surge_days.csv",
                                np.array(surge_days_per_rep), delimiter=",")
     comm.Barrier()
     if rank == 0:
@@ -333,7 +333,7 @@ if need_parse:
     for peak in np.arange(4):
 
         if split_peaks_amongst_processors:
-            if rank > 4:
+            if rank >= 4:
                 break
             else:
                 peak = rank
