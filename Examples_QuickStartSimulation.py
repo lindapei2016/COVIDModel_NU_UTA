@@ -135,6 +135,9 @@ print(rep.compute_cost())
 
 # We can also query whether the specified policy is
 #   feasible, i.e. whether it prevents an ICU capacity violation.
+#   Note that we check for an ICU capacity violation from
+#   timepoints fixed_kappa_end_date onwards. See below for
+#   more explanation of fixed_kappa_end_date.
 print(rep.compute_feasibility())
 
 # If we want to test the same policy on a different sample path,
@@ -213,6 +216,13 @@ rep.reset()
 
 rep.fixed_kappa_end_date = 100
 rep.simulate_time_period(945)
+
+# A SimReplication's method compute_feasibility() checks for ICU capacity
+#   violations from its fixed_kappa_end_date to its next_t. In this way,
+#   we only penalize ICU capacity violations during the time period that
+#   a MultiTierPolicy or CDCTierPolicy attached to the SimReplication instance
+#   is actually in effect.
+print(rep.compute_feasibility())
 
 ###############################################################################
 
