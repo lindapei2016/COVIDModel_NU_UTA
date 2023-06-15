@@ -21,6 +21,7 @@ import os
 # The beginning is similar to Examples_RetrospectiveDeterministic.py. You can skip to the plotting part.
 
 base_path = Path(__file__).parent
+
 ###############################################################################
 # Create a city object:
 austin = City(
@@ -52,9 +53,10 @@ seed = -1
 rep = SimReplication(austin, vaccines, mtp, seed)
 rep.fixed_kappa_end_date = austin.cal.calendar.index(history_end_time)
 rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time))
+
 temp_path = f"{base_path}/input_output_folder/austin"
-is_exist = os.path.exists(temp_path)
-if not is_exist:
+directory_exists = os.path.exists(temp_path)
+if not directory_exists:
     # Create a new directory because it does not exist
     os.makedirs(temp_path)
     print("The /input_output_folder directory is created!")
@@ -72,7 +74,8 @@ export_rep_to_json(
 )
 
 ###############################################################################
-# Now let's plot what we have simulated. Normally I use the Plotting.ph as a helper function but let's skip that
+
+# Now let's plot what we have simulated. Normally I use plot_from_file as a helper function but let's skip that
 # for a simple example.
 # First I read the json files that I recorded at the end of simulation.
 # Read the simulation outputs:

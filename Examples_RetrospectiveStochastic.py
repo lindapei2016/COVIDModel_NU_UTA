@@ -3,6 +3,9 @@
 # This script contains examples of how to run the stochastic simulation
 # for retrospective staged-alert system evaluation.
 
+# Note: this must be run using multiple processors to work correctly,
+#   since the multiprocessing package is used
+
 # Nazlican Arslan 2023
 ###############################################################################
 

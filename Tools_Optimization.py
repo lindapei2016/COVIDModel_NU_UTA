@@ -325,7 +325,7 @@ def evaluate_one_policy_one_sample_path(
 
 ###############################################################################
 
-# LP note -- this is Nazli's function -- I need to check to make sure
+# TODO: LP note -- this is Nazli's function -- I need to check to make sure
 #   I didn't break this when making Tools_Optimization edits
 def evaluate_single_policy_on_sample_path(city: object,
                                           vaccines: object,
