@@ -1,6 +1,6 @@
 ###############################################################################
 
-# Script_CDCRetrospectiveOptimization.py
+# Script_CDCOptimization.py
 
 # This script contains beginning-to-end sample path generation
 #   and evaluation of CDC policies. User can specify which CDC policies
@@ -81,16 +81,17 @@ num_reps_evaluated_per_policy = 100
 # Rep number to start on
 reps_offset = 0
 
+# If True, only test 2 policies
+using_test_set_only = False
+
+# Change to True if also want to automatically parse files
+need_parse = True
+
 # Assume that the number of processors >= 4
 # When True, for parsing, will use 4 processors and give
 #   1 peak to each processor
 split_peaks_amongst_processors = True
 
-# Change to True if also want to automatically parse files
-need_parse = True
-
-# If True, only test 2 policies
-using_test_set_only = False
 
 ###############################################################################
 
