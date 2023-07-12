@@ -1,0 +1,5 @@
+{
+  "num_days": 30,
+  "shedding_function": "param_beta",
+  "param_dim": 3
+}
