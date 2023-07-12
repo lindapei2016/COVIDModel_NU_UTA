@@ -105,6 +105,7 @@ class SimReplication:
         # Apr. 19, 2023, Sonny, tracking wastewater signal
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.wastewater_viral_load = []
+        self.log_wastewater_viral_load = []
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def init_rng(self):
@@ -315,6 +316,7 @@ class SimReplication:
             self.next_t += 1
 
             self.simulate_t(t, fixed_kappa_end_date)
+
             # print(t)
 
             A = self.instance.A
@@ -361,10 +363,11 @@ class SimReplication:
                 _w = 0
                 for i in range(self.instance.viral_shedding_profile['num_days']):
                     if t - i >= time_start:
-                        _w += np.sum(self.instance.viral_shedding_profile["shedding_function_val"][i]
+                        p = self.instance.viral_shedding_date_period_array[t-i]# period of the viral shedding profile
+                        _w += np.sum(self.instance.viral_shedding_profile["val"][p][i]
                                      * self.SE_history[t - i])
                 self.wastewater_viral_load.append(_w)
-
+                self.log_wastewater_viral_load.append(np.log(_w + 1))
             # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
             # LP note -- might want to comment if not debugging and
@@ -413,6 +416,8 @@ class SimReplication:
 
         if t <= fixed_kappa_end_date:
             # If the transmission reduction is fixed don't call the policy object.
+            #print("debug")
+            #print(self.instance.cal.fixed_transmission_reduction)
             phi_t = epi.effective_phi(
                 self.instance.cal.schools_closed[t],
                 self.instance.cal.fixed_cocooning[t],
@@ -828,6 +833,7 @@ class SimReplication:
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         # Apr. 19, 2023, Sonny, reset viral load
         self.wastewater_viral_load = []
+        self.log_wastewater_viral_load  = []
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
         self.next_t = 0
