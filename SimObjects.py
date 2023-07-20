@@ -31,6 +31,84 @@ def find_tier(thresholds, stat):
 
     return lb_threshold
 
+def find_tier_WA_case(thresholds_case, stat_case):
+    """
+    Calculate the new tier according to the tier statistics.
+    :param thresholds: the tier thresholds.
+    :param stat: the critical statistics that would determine the next tier.
+    :return: the new tier.
+    """
+
+    if stat_case >= thresholds_case[2]:
+        return 2
+    elif stat_case < thresholds_case[1]:
+        return 0
+    else:
+        return 1
+
+def find_tier_WA_hosp(thresholds_hosp, stat_hosp):
+    """
+    Calculate the new tier according to the tier statistics.
+    :param thresholds: the tier thresholds.
+    :param stat: the critical statistics that would determine the next tier.
+    :return: the new tier.
+    """
+
+    if stat_hosp >= thresholds_hosp[2]:
+        return 2
+    elif stat_hosp < thresholds_hosp[1]:
+        return 0
+    else:
+        return 1
+
+def find_tier_WA_icu(thresh_ICU, stat_ICU):
+    """
+    Calculate the new tier according to the tier statistics.
+    :param thresholds: the tier thresholds.
+    :param stat: the critical statistics that would determine the next tier.
+    :return: the new tier.
+    """
+
+    if stat_ICU >= thresh_ICU[1]:
+        return 2
+    else:
+        return 0
+
+def find_tier_WA(tier_case, tier_hosp, tier_icu):
+    """
+    Calculate the new tier according to the tier statistics.
+    :param thresholds: the tier thresholds.
+    :param stat: the critical statistics that would determine the next tier.
+    :return: the new tier.
+    """
+
+    if tier_icu == 3:
+        return 2
+    elif tier_case == 3 and tier_hosp == 3:
+        return 2
+    elif tier_case == 1 or tier_hosp == 1:
+        return 0
+    else:
+        return 1
+
+def find_ind_WA(tier_case, tier_hosp, tier_icu):
+    """
+        Calculate the active indicator based on tier statistics.
+        :param thresholds: the tier thresholds.
+        :param stat: the critical statistics that would determine the next tier.
+        :return: the active indicator (1 = cases, 2 = hosp, 3 = icu, 4 = case and hosp).
+    """
+    if tier_icu == 3:
+        return 3
+    elif tier_case > tier_hosp:
+        return 1
+    elif tier_case < tier_hosp:
+        return 2
+    else:
+        return 4
+
+
+
 
 ###############################################################################
 # Modules:
@@ -266,6 +344,111 @@ class MultiTierPolicy:
             t_end = t + 1
 
         self.tier_history += [new_tier for i in range(t_end - t)]
+
+
+class MultiTierPolicyWA:
+    """
+    A multi-tier policy allows for multiple tiers of lock-downs.
+    Attrs:
+        tiers (list of dict): a list of the tiers characterized by a dictionary
+            with the following entries:
+                {
+                    "transmission_reduction": float [0,1)
+                    "cocooning": float [0,1)
+                    "school_closure": int {0,1}
+                }
+
+        lockdown_thresholds_case (list of list): a list with the thresholds for every
+            tier (case counts). The list must have n-1 elements if there are n tiers. Each threshold
+            is a list of values for evert time step of simulation.
+        lockdown_thresholds_hosp (list of list): a list with the thresholds for every
+            tier (hospitalizations). The list must have n-1 elements if there are n tiers. Each threshold
+            is a list of values for evert time step of simulation.
+        community_transmission: (deprecated) CDC's old community transmission threshold for staging.
+                                Not in use anymore.
+    """
+
+    def __init__(self, instance, tiers, lockdown_thresholds_case, lockdown_thresholds_hosp, lockdown_thresholds_ICU):
+        self._instance = instance
+        self.tiers = tiers.tier
+        self.lockdown_thresholds_case = lockdown_thresholds_case
+        self.lockdown_thresholds_hosp = lockdown_thresholds_hosp
+        self.lockdown_thresholds_ICU = lockdown_thresholds_ICU
+        self.tier_history = None
+        self.active_indicator_history = []
+
+    def reset(self):
+        self.tier_history = None
+        self.active_indicator_history = []
+
+    def __repr__(self):
+        return str(self.lockdown_thresholds_case)
+
+    def __call__(self, t, ToIHT, IH, ToIY, ICU):
+        """
+        Function that makes an instance of a policy a callable.
+
+        """
+        N = self._instance.N
+
+        if self.tier_history is None:
+            self.tier_history = [None for i in range(t)]
+            self.active_indicator_history = [None for i in range(t)]
+
+        if len(self.tier_history) > t:
+            return
+
+        ToIY = np.array(ToIY)
+        ToIHT = np.array(ToIHT)
+        ICU = np.array(ICU)
+
+        # Set moving average ranges
+        moving_avg_start_hosp = np.maximum(0, t - 7)
+        moving_avg_start_case = np.maximum(0, t - 14)
+
+        # find hospitalizations 7 day avg per 100k
+        if len(ToIHT) > 0:
+            criStatIHT_total = ToIHT.sum((1, 2))
+            criStatIHT_avg = criStatIHT_total[moving_avg_start_hosp:].sum()
+            ToIHT_avg = 100000 * criStatIHT_avg / N.sum((0, 1))
+        else:
+            criStatIHT_avg = 0
+            ToIHT_avg = 100000 * criStatIHT_avg / N.sum((0, 1))
+
+        # Compute 14 day case avg per 100k:
+        if len(ToIY) > 0:
+            ToIY_avg = (
+                    ToIY.sum((1, 2))[moving_avg_start_case:].sum()
+                    * 100000
+                    / np.sum(N, axis=(0, 1))
+            )
+        else:
+            ToIY_avg = 0
+
+        # Compute % of ICU capacity reached:
+        ICU_amt = ICU.sum((1, 2))[t:].sum() / self._instance.icu
+
+        # find new tier
+        new_tier_case = find_tier_WA_case(self.lockdown_thresholds_case, ToIY_avg)
+        new_tier_hosp = find_tier_WA_hosp(self.lockdown_thresholds_hosp, ToIHT_avg)
+        new_tier_icu = find_tier_WA_icu(self.lockdown_thresholds_ICU, ICU_amt)
+        new_tier = find_tier_WA(new_tier_case, new_tier_hosp, new_tier_icu)
+
+        active_indicator = find_ind_WA(new_tier_case, new_tier_hosp, new_tier_icu)
+
+        if len(self.tier_history) > 0:
+            current_tier = self.tier_history[t - 1]
+        else:
+            current_tier = new_tier
+
+        if current_tier != new_tier:  # bump to the next tier
+            t_end = t + self.tiers[new_tier]["min_enforcing_time"]
+        else:  # stay in same tier for one more time period
+            new_tier = current_tier
+            t_end = t + 1
+
+        self.tier_history += [new_tier for i in range(t_end - t)]
+        self.active_indicator_history += [active_indicator for i in range(t_end - t)]
 
 
 class VaccineGroup:

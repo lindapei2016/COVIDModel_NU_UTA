@@ -105,7 +105,7 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
                 # Report the percent active CDC indicator
                 print(f"Active indicator percentages: {sim_history_key_stats(active_ind_given_red, 3)}")
 
-            if "CDC" not in policy_outputs["policy_type"][0]:
+            if len(policy_outputs["policy_type"][0])==5:
                 plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id,
                             color=('k', 'silver'))
                 plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0], tier_colors)

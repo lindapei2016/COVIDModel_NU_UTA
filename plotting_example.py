@@ -5,7 +5,7 @@
 # Nazlican Arslan 2023
 ###############################################################################
 
-from SimObjects import MultiTierPolicy, CDCTierPolicy
+from SimObjects import MultiTierPolicy, CDCTierPolicy, MultiTierPolicyWA
 from DataObjects import City, TierInfo, Vaccine
 from SimModel import SimReplication
 from InputOutputTools import export_rep_to_json
@@ -48,12 +48,18 @@ mtp = MultiTierPolicy(austin, tiers_austin, thresholds_austin, "green")
 history_end_time = dt.datetime(2020, 5, 30)  # use fixed transmission value until history en time.
 simulation_end_time = dt.datetime(2020, 10, 1)
 
+tiers_WA = TierInfo("austin", "tiers_CDC.json")
+threshold_WA_case = (-1, 200, 350)
+threshold_WA_hosp = (-1, 5, 10)
+threshold_WA_ICU = (-1, 0.9)
+mtpWA = MultiTierPolicyWA(austin, tiers_WA, threshold_WA_case, threshold_WA_hosp, threshold_WA_ICU)
+
 # Define the deterministic simulation with CDC system, you can define for Austin system with mtp object:
 seed = -1
-rep = SimReplication(austin, vaccines, mtp, seed)
+rep = SimReplication(austin, vaccines, mtpWA, seed)
 rep.fixed_kappa_end_date = austin.cal.calendar.index(history_end_time)
 rep.simulate_time_period(austin.cal.calendar.index(simulation_end_time))
-temp_path = f"{base_path}/input_output_folder/austin"
+temp_path = f"{base_path}/input_output_folder/WA"
 is_exist = os.path.exists(temp_path)
 if not is_exist:
     # Create a new directory because it does not exist
@@ -61,7 +67,7 @@ if not is_exist:
     print("The /input_output_folder directory is created!")
 
 # but you can define your own convention and define the name of the output files in a different way:
-base_filename = f"{base_path}/input_output_folder/austin/{seed}_1_{history_end_time.date()}_{str(mtp)}"
+base_filename = f"{base_path}/input_output_folder/WA/{seed}_1_{history_end_time.date()}_{str(mtpWA)}"
 export_rep_to_json(
     rep,
     f"{base_filename}_sim_updated.json",
@@ -81,7 +87,7 @@ export_rep_to_json(
 # This is a helper function I used to plot a bunch of simulation outcomes. The import_stoch_reps_reporting
 # collect multiple sample path outputs and combine them in a list. So this is again a helper function.
 sim_outputs, policy_outputs = import_stoch_reps_for_reporting([seed], 1, history_end_time, austin,
-                                                              str(mtp), "input_output_folder/austin")
+                                                              str(mtpWA), "input_output_folder/WA")
 
 # Now I have my simulation outputs I can start plotting.
 # Here this example is only for the deterministic path. So there is only one sample path.
@@ -100,24 +106,27 @@ ToIHT_hist = sim_outputs["ToIHT_history"]  # grab the hospitalization data from 
 real_ToIHT_hist = austin.real_ToIHT_history  # let's also grab the real historical data.
 
 # Let's define a Plot object:
-plot = Plot(austin, history_end_time, real_ToIHT_hist, ToIHT_hist, "ToIHT_history", str(mtp), central_path_id,
+plot = Plot(austin, history_end_time, real_ToIHT_hist, ToIHT_hist, "ToIHT_history", str(mtpWA), central_path_id,
             color=('k', 'silver'))
 
 # Let's first plot the thresholds with horizontal lines in the background:
 tier_colors_ctp = {0: "blue", 1: "yellow", 2: "orange", 3: "red"}  # define the plot colors you would like for each tier.
+tier_colors_mtp = {0: "yellow", 1: "orange", 2: "red"}
 
 # I use horizontal_plot to plot horizontal ones:
-plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0], tier_colors_ctp)
+
+### Commented this piece out because it was still not running
+plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0],tier_colors_mtp)
 
 # Now let's plot ICU with Dali plots:
 ICU_hist = sim_outputs["ICU_history"]
 real_ICU_hist = austin.real_ICU_history
-plot_icu_dali = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtp), central_path_id)
-plot_icu_dali.dali_plot(policy_outputs["tier_history"], tier_colors_ctp, austin.icu)
+plot_icu_dali = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtpWA), central_path_id)
+plot_icu_dali.dali_plot(policy_outputs["tier_history"], tier_colors_mtp, austin.icu)
 
 # You can instead plot ICU with vertical background:
-plot_icu_vertical = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtp), central_path_id)
-plot_icu_vertical.vertical_plot(policy_outputs["tier_history"], tier_colors_ctp, austin.icu)
+plot_icu_vertical = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtpWA), central_path_id)
+plot_icu_vertical.vertical_plot(policy_outputs["tier_history"], tier_colors_mtp, austin.icu)
 
 # There are even more plotting options in the Plot class.
 
