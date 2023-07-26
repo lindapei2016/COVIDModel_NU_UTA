@@ -1,20 +1,8 @@
 ###############################################################################
 
-# Script_CDCOptimization.py
-
-# This script contains beginning-to-end sample path generation
-#   and evaluation of CDC policies. User can specify which CDC policies
-#   they would like to evaluate.
-# Can split up sample path generation and policy evaluation on
-#   parallel processors using ''mpi4py.''
-# The number of sample paths generated (and number of replications
-#   that each policy is evaluated on) is
-#       num_processors_evaluation x sample_paths_generated_per_processor
-#           (num_processors_evaluation) is inferred from mpi call
-#           (sample_paths_generated_per_processor is a variable that is
-#       specified in the code)
-
-# Linda Pei 2023
+# Based off of Script_CDCOptimization.py
+# Simulating as if only hospital admits and as if only staffed bed indicators
+# Doing first peak first!
 
 ###############################################################################
 
@@ -79,12 +67,15 @@ sample_paths_generated_per_processor = 1
 # Change to False if evaluation is already done
 need_evaluation = True
 
+# Change to False if allowing 2 indicators
+single_indicator_policies = False
+
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 200
+num_reps_evaluated_per_policy = 100
 
 # Reps offset
 # Rep number to start on
-reps_offset = 100
+reps_offset = 0
 
 # If True, only test 2 policies
 using_test_set_only = False
@@ -95,7 +86,7 @@ need_parse = True
 # Assume that the number of processors >= 4
 # When True, for parsing, will use 4 processors and give
 #   1 peak to each processor
-split_peaks_amongst_processors = True
+split_peaks_amongst_processors = False
 
 
 ###############################################################################
@@ -143,50 +134,40 @@ case_threshold = 200
 pre_vaccine_policies = []
 post_vaccine_policies = []
 
-# This creates 1296 policies
-# non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-#                                                                              (-1, 0, 1),
-#                                                                              (0, 0.4, 0.05),
-#                                                                              (0, 0.4, 0.05))
-#
-# non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-#                                                                               (-1, 0, 1),
-#                                                                               (0, 40, 5),
-#                                                                               (0, 40, 5))
+if single_indicator_policies:
+    non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                  (-1, 0, 1),
+                                                                                  (0, 51, 1),
+                                                                                  (0, 51, 1))
+    non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                 (-1, 0, 1),
+                                                                                 (0, .51, .01),
+                                                                                 (0, .51, .01))
+else:
+    non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                  (-1, 0, 1),
+                                                                                  (0, 10, 1),
+                                                                                  (17, 51, 1))
+    non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                 (-1, 0, 1),
+                                                                                 (0, .2, 0.05),
+                                                                                 (0.25, 0.55, 0.05))
 
-# Enlarged space
-# 2334 policies excluding original 1296 policies
-# See addition of "continue" condition
-non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                             (-1, 0, 1),
-                                                                             (0, 0.5, 0.05),
-                                                                             (0, 0.5, 0.05))
+if single_indicator_policies:
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
-non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                              (-1, 0, 1),
-                                                                              (0, 55, 5),
-                                                                              (0, 55, 5))
-
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-
-    for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-
-        if non_surge_staffed_thresholds[-1] < 0.4 and non_surge_hosp_adm_thresholds[-1] < 40:
-            continue
-
-        staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                            non_surge_staffed_thresholds[3],
-                                            non_surge_staffed_thresholds[4]),
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+        staffed_thresholds = {"non_surge": (np.inf,
+                                            np.inf,
+                                            np.inf),
                               "surge": (-1,
                                         -1,
-                                        non_surge_staffed_thresholds[3])}
+                                        np.inf)}
         pre_vaccine_policy = CDCTierPolicy(austin,
                                            pre_vaccine_tiers,
                                            case_threshold,
@@ -200,12 +181,88 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
         pre_vaccine_policies.append(pre_vaccine_policy)
         post_vaccine_policies.append(post_vaccine_policy)
 
+    for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+
+        hosp_adm_thresholds = {"non_surge": (np.inf,
+                                             np.inf,
+                                             np.inf),
+                               "surge": (-1,
+                                         -1,
+                                         np.inf)}
+        staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                            non_surge_staffed_thresholds[3],
+                                            non_surge_staffed_thresholds[4]),
+                              "surge": (-1,
+                                        -1,
+                                        non_surge_staffed_thresholds[3])}
+
+        pre_vaccine_policy = CDCTierPolicy(austin,
+                                           pre_vaccine_tiers,
+                                           case_threshold,
+                                           hosp_adm_thresholds,
+                                           staffed_thresholds)
+        post_vaccine_policy = CDCTierPolicy(austin,
+                                            post_vaccine_tiers,
+                                            case_threshold,
+                                            hosp_adm_thresholds,
+                                            staffed_thresholds)
+        pre_vaccine_policies.append(pre_vaccine_policy)
+        post_vaccine_policies.append(post_vaccine_policy)
+else:
+    # both indicators but compare to single-indicator solutions that were feasible
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+
+        for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+
+            staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                                non_surge_staffed_thresholds[3],
+                                                non_surge_staffed_thresholds[4]),
+                                  "surge": (-1,
+                                            -1,
+                                            non_surge_staffed_thresholds[3])}
+            # non surge hosp adm threshold #1 must be <= 10
+            # non surge staffed threshold #1 must be <= .12
+
+            # non surge hosp adm threshold #2 and non surge staffed threshold #2 must be >= single indicator optimal
+
+            # best hosp admits only policy is also constrained optimal policy with weights 1/10/100
+            # (200, {'non_surge': (-1, 1, 17), 'surge': (-1, -1, 1)}, {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)})
+
+            # best staffed beds only policy
+            # (200, {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)}, {'non_surge': (-1, 0.01, 0.25), 'surge': (-1, -1, 0.01)})
+
+            # Not necessary any more because I incorporated this into the threshold generator inputs
+            # if non_surge_hosp_adm_thresholds[3] > 10 and non_surge_staffed_thresholds[3] > 0.12:
+            #     continue
+            # elif non_surge_hosp_adm_thresholds[4] < 17 or non_surge_staffed_thresholds[4] < .25:
+            #     continue
+
+            if False:
+                pass
+            else:
+                pre_vaccine_policy = CDCTierPolicy(austin,
+                                                   pre_vaccine_tiers,
+                                                   case_threshold,
+                                                   hosp_adm_thresholds,
+                                                   staffed_thresholds)
+                post_vaccine_policy = CDCTierPolicy(austin,
+                                                    post_vaccine_tiers,
+                                                    case_threshold,
+                                                    hosp_adm_thresholds,
+                                                    staffed_thresholds)
+                pre_vaccine_policies.append(pre_vaccine_policy)
+                post_vaccine_policies.append(post_vaccine_policy)
+
 if using_test_set_only:
     pre_vaccine_policies = pre_vaccine_policies[:2]
     post_vaccine_policies = post_vaccine_policies[:2]
-
-# print(len(pre_vaccine_policies))
-# breakpoint()
 
 ###############################################################################
 
@@ -319,7 +376,7 @@ if need_evaluation:
                 policy.reset()
 
                 # Every 10 replications, save output
-                if rep_counter % 10 == 0 or rep_counter == num_reps_evaluated_per_policy:
+                if rep_counter == 10 or rep_counter % 50 == 0 or rep_counter == num_reps_evaluated_per_policy:
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_cost.csv",
                                np.array(cost_per_rep), delimiter=",")
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_feasibility.csv",

@@ -3,7 +3,7 @@
 # LP's WIP parsing script scratchpad
 # Right now very messy and redundant -- but successfully parses
 #   aggregated .csv files after running "parse" option in Script_CDCOptimization.py
-# Assumes there is a folder called "aggregated_expanded_3630" with the relevant aggregated
+# Assumes there is a folder called "singleindicator_aggregated" with the relevant aggregated
 #   .csv files
 #
 ###############################################################################
@@ -18,50 +18,6 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 base_path = Path(__file__).parent
-
-###############################################################################
-
-# Change to True if compile simulation data when multiple .sh files are submitted
-#   (e.g. first run for 100 replications and then run for 200 replications)
-need_combine = False
-
-# if need_combine:
-#     A_filenames = glob.glob("**/*_A.csv")
-#     B_filenames = glob.glob("**/*_B.csv")
-#     C_filenames = glob.glob("**/*_C.csv")
-#
-#     for filename in A_filenames:
-#         base_filename = filename.split("_A.csv")[0]
-#         A_df = pd.read_csv(base_filename + "_A.csv", index_col=0)
-#         B_df = pd.read_csv(base_filename + "_B.csv", index_col=0)
-#         C_df = pd.read_csv(base_filename + "_C.csv", index_col=0)
-#         compiled_df = pd.concat((A_df, B_df, C_df), axis=0)
-#
-#         new_columns = [str(int(column) + 1296) for column in compiled_df.columns]
-#         compiled_df.columns = new_columns
-#
-#         compiled_df.to_csv(base_filename + "_expanded.csv")
-#
-#         # print(len(set(compiled_df.columns)) == len(compiled_df.columns))
-
-# breakpoint()
-
-if need_combine:
-    A_filenames = glob.glob("**/*_base.csv")
-    B_filenames = glob.glob("**/*_expanded.csv")
-
-    for filename in A_filenames:
-        base_filename = filename.split("_base.csv")[0]
-        A_df = pd.read_csv(base_filename + "_base.csv", index_col=0)
-        B_df = pd.read_csv(base_filename + "_expanded.csv", index_col=0)
-        A_df.reset_index(inplace=True, drop=True)
-        B_df.reset_index(inplace=True, drop=True)
-        compiled_df = pd.concat((A_df, B_df), axis=1)
-        compiled_df.to_csv(base_filename + ".csv")
-
-        # print(compiled_df.columns)
-
-# breakpoint()
 
 ###############################################################################
 
@@ -109,64 +65,39 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
 
 # Better to replace this with a .csv file of policies or something
 
-case_threshold = 200
+single_indicator_policies = True
 
 policies = []
 
-# Base set of policies
-non_surge_staffed_thresholds_array = thresholds_generator((-1, 0, 1),
-                                                          (-1, 0, 1),
-                                                          (0, 0.4, 0.05),
-                                                          (0, 0.4, 0.05))
+case_threshold = 200
 
 non_surge_hosp_adm_thresholds_array = thresholds_generator((-1, 0, 1),
                                                            (-1, 0, 1),
-                                                           (0, 40, 5),
-                                                           (0, 40, 5))
-
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-
-    for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-        staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                            non_surge_staffed_thresholds[3],
-                                            non_surge_staffed_thresholds[4]),
-                              "surge": (-1,
-                                        -1,
-                                        non_surge_staffed_thresholds[3])}
-
-        policies.append([case_threshold, hosp_adm_thresholds, staffed_thresholds])
-
-# Then add new policies to create expanded set
+                                                           (1, 51, 1),
+                                                           (1, 51, 1))
 non_surge_staffed_thresholds_array = thresholds_generator((-1, 0, 1),
-                                                                             (-1, 0, 1),
-                                                                             (0, 0.5, 0.05),
-                                                                             (0, 0.5, 0.05))
+                                                          (-1, 0, 1),
+                                                          (0.01, 0.51, 0.01),
+                                                          (0.01, 0.51, 0.01))
 
-non_surge_hosp_adm_thresholds_array = thresholds_generator((-1, 0, 1),
-                                                                              (-1, 0, 1),
-                                                                              (0, 55, 5),
-                                                                              (0, 55, 5))
+if single_indicator_policies:
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+        staffed_thresholds = {"non_surge": (np.inf,
+                                            np.inf,
+                                            np.inf),
+                              "surge": (-1,
+                                        -1,
+                                        np.inf)}
+        policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-
-        if non_surge_staffed_thresholds[-1] < 0.4 and non_surge_hosp_adm_thresholds[-1] < 40:
-            continue
 
         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
                                             non_surge_staffed_thresholds[3],
@@ -174,15 +105,33 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                               "surge": (-1,
                                         -1,
                                         non_surge_staffed_thresholds[3])}
-        policies.append([case_threshold, hosp_adm_thresholds, staffed_thresholds])
 
-ix_list = []
+        hosp_adm_thresholds = {"non_surge": (np.inf,
+                                             np.inf,
+                                             np.inf),
+                               "surge": (-1,
+                                         -1,
+                                         np.inf)}
+        policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+else:
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
-for i in range(len(policies)):
-    policy = policies[i]
-    if policy[1]["non_surge"][1] == 0 and policy[1]["non_surge"][2] == 15 and policy[2]["non_surge"][1] < .45\
-            and policy[2]["non_surge"][2] == 0.45:
-        ix_list.append(i)
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+
+        for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+
+            staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                                non_surge_staffed_thresholds[3],
+                                                non_surge_staffed_thresholds[4]),
+                                  "surge": (-1,
+                                            -1,
+                                            non_surge_staffed_thresholds[3])}
+            policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
 breakpoint()
 
@@ -215,16 +164,16 @@ ICU_violation_patient_days_dict = {}
 feasibility_dict = {}
 
 for peak in np.arange(4):
-    stage1_days_df = pd.read_csv(base_path / "aggregated_expanded_3630" / ("aggregated_peak" + str(peak) + "_stage1_days.csv"),
+    stage1_days_df = pd.read_csv(base_path / "singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage1_days.csv"),
                                  index_col=0)
-    stage2_days_df = pd.read_csv(base_path / "aggregated_expanded_3630" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
+    stage2_days_df = pd.read_csv(base_path / "singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
                                  index_col=0)
-    stage3_days_df = pd.read_csv(base_path / "aggregated_expanded_3630" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
+    stage3_days_df = pd.read_csv(base_path / "singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
                                  index_col=0)
-    ICU_violation_patient_days_df = pd.read_csv(base_path / "aggregated_expanded_3630" /
+    ICU_violation_patient_days_df = pd.read_csv(base_path / "singleindicator_aggregated" /
                                                 ("aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv"),
                                                 index_col=0)
-    feasibility_df = pd.read_csv(base_path / "aggregated_expanded_3630" / ("aggregated_peak" + str(peak) + "_feasibility.csv"),
+    feasibility_df = pd.read_csv(base_path / "singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_feasibility.csv"),
                                  index_col=0)
     stage1_days_dict[str(peak)] = stage1_days_df
     stage2_days_dict[str(peak)] = stage2_days_df
@@ -232,24 +181,12 @@ for peak in np.arange(4):
     ICU_violation_patient_days_dict[str(peak)] = ICU_violation_patient_days_df
     feasibility_dict[str(peak)] = feasibility_df
     # breakpoint()
-    
-###############################################################################
-
-# Find index of CDC policy
-
-ix_counter = 0
-for policy in policies:
-    if policy[1]["non_surge"] == (-1, 10, 20) and policy[2]["non_surge"] == (-1, .1, .2):
-        break
-    ix_counter += 1
-
-CDC_ix = ix_counter
 
 ###############################################################################
 
 # Find unconstrained optimization optimal across peaks
 
-for w in [i for i in range(1,11)] + [1e2, 1e3, 1e4, 1e5, 1e6]:
+for w in [i for i in range(1,11)] + [1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, np.inf]:
 
     cost_dfs_per_peak = []
     ICU_violation_patient_days_per_peak = []
@@ -284,7 +221,9 @@ for w in [i for i in range(1,11)] + [1e2, 1e3, 1e4, 1e5, 1e6]:
         feasibility_dfs_per_peak[2] + feasibility_dfs_per_peak[3]
     feasibility_all_peaks = feasibility_all_peaks[feasibility_all_peaks >= 4]
 
-    print(w, optimal_policy[1]["non_surge"], optimal_policy[2]["non_surge"], ICU_violation_patient_days_across_peaks.mean()[str(optimal_ix)], feasibility_all_peaks.sum()[str(optimal_ix)]/1200)
+    print(w, optimal_policy[1]["non_surge"], optimal_policy[2]["non_surge"],
+          ICU_violation_patient_days_across_peaks.mean()[str(optimal_ix)],
+          feasibility_all_peaks.sum()[str(optimal_ix)]/400)
 
 breakpoint()
 
@@ -396,28 +335,42 @@ for peak in np.arange(4):
 
     print(stage3_days_df[min_cost_ix].quantile(0.5))
 
-for ix in ix_list:
-    for peak in np.arange(4):
-        feasibility_df = feasibility_dict[str(peak)]
-        print(feasibility_df[str(ix)].mean())
+breakpoint()
 
-    for peak in np.arange(4):
-        stage2_days_df = stage2_days_dict[str(peak)]
-        if peak == 0:
-            stage2_days_df_across_peaks = stage2_days_df
-        else:
-            stage2_days_df_across_peaks = stage2_days_df_across_peaks.add(stage2_days_df)
+###############################################################################
 
-        print(stage2_days_df[str(ix)].quantile(0.5))
+# Get info on feasible policies
 
-    for peak in np.arange(4):
-        stage3_days_df = stage3_days_dict[str(peak)]
-        if peak == 0:
-            stage3_days_df_across_peaks = stage3_days_df
-        else:
-            stage3_days_df_across_peaks = stage3_days_df_across_peaks.add(stage3_days_df)
+feasible_sols_across_peak = np.asarray(feasible_sols_across_peak, dtype=int)
+np.asarray(policies)[feasible_sols_across_peak]
 
-        print(stage3_days_df[str(ix)].quantile(0.5))
+feasible_non_surge_hosp_adm_thresholds = []
+feasible_non_surge_staffed_thresholds = []
+
+for policy in np.asarray(policies)[feasible_sols_across_peak]:
+    if policy[1]["non_surge"][0] < np.inf:
+        feasible_non_surge_hosp_adm_thresholds.append(policy[1]["non_surge"])
+    elif policy[2]["non_surge"][0] < np.inf:
+        feasible_non_surge_staffed_thresholds.append(policy[2]["non_surge"])
+
+feasible_non_surge_hosp_adm_thresholds.sort()
+feasible_non_surge_staffed_thresholds.sort()
+
+ix_increasing_cost_sorted = np.array(average_cost_across_peaks.sort_values().index, dtype=int)
+for ix in ix_increasing_cost_sorted:
+    if policies[ix][2]["non_surge"][0] != np.inf:
+        print(policies[ix])
+
+# non surge hosp adm threshold #1 must be <= 10
+# non surge staffed threshold #1 must be <= .12
+
+# best hosp admits only policy is also constrained optimal policy with weights 1/10/100
+# (200, {'non_surge': (-1, 1, 17), 'surge': (-1, -1, 1)}, {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)})
+
+# best staffed beds only policy
+# (200, {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)}, {'non_surge': (-1, 0.01, 0.25), 'surge': (-1, -1, 0.01)})
+
+breakpoint()
 
 ###############################################################################
 
@@ -426,6 +379,8 @@ for peak in np.arange(4):
 
 for peak in np.arange(4):
     print(np.average(stage2_days_dict[str(peak)].mean()[feasible_sols_across_peak]))
+
+breakpoint()
 
 # Get variances of number of days in yellow and red
 
