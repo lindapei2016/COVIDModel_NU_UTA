@@ -45,14 +45,15 @@ tiers_austin = TierInfo("austin", "tiers4.json")
 thresholds_austin = (-1, 15, 25, 50)  # Austin's system has one indicator.
 mtp = MultiTierPolicy(austin, tiers_austin, thresholds_austin, "green")
 
-history_end_time = dt.datetime(2020, 5, 30)  # use fixed transmission value until history en time.
-simulation_end_time = dt.datetime(2020, 10, 1)
+history_end_time = dt.datetime(2021, 11, 30)  # use fixed transmission value until history en time.
+simulation_end_time = dt.datetime(2022, 4, 1)
 
 tiers_WA = TierInfo("austin", "tiers_CDC.json")
+tiers_WA_reduced = TierInfo("austin", "tiers_CDC_reduced_values.json")
 threshold_WA_case = (-1, 200, 350)
 threshold_WA_hosp = (-1, 5, 10)
 threshold_WA_ICU = (-1, 0.9)
-mtpWA = MultiTierPolicyWA(austin, tiers_WA, threshold_WA_case, threshold_WA_hosp, threshold_WA_ICU)
+mtpWA = MultiTierPolicyWA(austin, tiers_WA_reduced, threshold_WA_case, threshold_WA_hosp, threshold_WA_ICU)
 
 # Define the deterministic simulation with CDC system, you can define for Austin system with mtp object:
 seed = -1
@@ -116,7 +117,7 @@ tier_colors_mtp = {0: "yellow", 1: "orange", 2: "red"}
 # I use horizontal_plot to plot horizontal ones:
 
 ### Commented this piece out because it was still not running
-plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0],tier_colors_mtp)
+#plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0],tier_colors_mtp)
 
 # Now let's plot ICU with Dali plots:
 ICU_hist = sim_outputs["ICU_history"]
