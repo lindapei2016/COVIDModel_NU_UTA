@@ -39,7 +39,7 @@ def find_tier_WA_case(thresholds_case, stat_case):
     :return: the new tier.
     """
 
-    if stat_case >= thresholds_case[2]:
+    if stat_case > thresholds_case[2]:
         return 2
     elif stat_case < thresholds_case[1]:
         return 0
@@ -54,7 +54,7 @@ def find_tier_WA_hosp(thresholds_hosp, stat_hosp):
     :return: the new tier.
     """
 
-    if stat_hosp >= thresholds_hosp[2]:
+    if stat_hosp > thresholds_hosp[2]:
         return 2
     elif stat_hosp < thresholds_hosp[1]:
         return 0
@@ -69,7 +69,7 @@ def find_tier_WA_icu(thresh_ICU, stat_ICU):
     :return: the new tier.
     """
 
-    if stat_ICU >= thresh_ICU[1]:
+    if stat_ICU > thresh_ICU[1]:
         return 2
     else:
         return 0
@@ -82,9 +82,9 @@ def find_tier_WA(tier_case, tier_hosp, tier_icu):
     :return: the new tier.
     """
 
-    if tier_icu == 3:
+    if tier_icu == 2:
         return 2
-    elif tier_case == 3 and tier_hosp == 3:
+    elif tier_case == 2 and tier_hosp == 2:
         return 2
     elif tier_case == 1 or tier_hosp == 1:
         return 0
@@ -98,7 +98,7 @@ def find_ind_WA(tier_case, tier_hosp, tier_icu):
         :param stat: the critical statistics that would determine the next tier.
         :return: the active indicator (1 = cases, 2 = hosp, 3 = icu, 4 = case and hosp).
     """
-    if tier_icu == 3:
+    if tier_icu == 2:
         return 3
     elif tier_case > tier_hosp:
         return 1
