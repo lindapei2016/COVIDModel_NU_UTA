@@ -323,7 +323,38 @@ def evaluate_one_policy_one_sample_path(
 
     return cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days, surge_days
 
+def evaluate_one_policy_one_sample_path_WA(
+        policy,
+        sim_rep,
+        end_time
+):
+    '''
+    :param policy: [obj] MultiTierPolicy or CDCTierPolicy instance
+    :param sim_rep: [obj] SimReplication instance
+    :param end_time: [int] nonnegative integer, time at which to stop
+        simulating and evaluating each policy -- must be greater (later than)
+        the time at which the sample paths stopped
+    '''
+    sim_rep.policy = policy
 
+    start_time = sim_rep.next_t
+    sim_rep.fixed_kappa_end_date = start_time
+
+    sim_rep.simulate_time_period(end_time)
+
+    cost = sim_rep.compute_cost()
+    feasibility = sim_rep.compute_feasibility()
+
+    stage1_days = np.sum(np.array(sim_rep.policy.tier_history) == 0)
+    stage2_days = np.sum(np.array(sim_rep.policy.tier_history) == 1)
+    stage3_days = np.sum(np.array(sim_rep.policy.tier_history) == 2)
+
+    ICU_difference = np.array(sim_rep.ICU_history).sum(axis=(1, 2))[sim_rep.fixed_kappa_end_date:] - sim_rep.instance.icu
+    ICU_violation_patient_days = np.sum(ICU_difference[ICU_difference >= 0])
+
+    #surge_days = np.sum([i for i in sim_rep.policy.surge_history if i is not None])
+
+    return cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days
 ###############################################################################
 
 # TODO: LP note -- this is Nazli's function -- I need to check to make sure

@@ -31,14 +31,16 @@ import pandas as pd
 import numpy as np
 import glob
 
-from mpi4py import MPI
+#from mpi4py import MPI
 from pathlib import Path
 
 base_path = Path(__file__).parent
 
-comm = MPI.COMM_WORLD
-num_processors_evaluation = comm.Get_size()
-rank = comm.Get_rank()
+#comm = MPI.COMM_WORLD
+#num_processors_evaluation = comm.Get_size()
+#rank = comm.Get_rank()
+rank=0
+num_processors_evaluation = 1
 
 ###############################################################################
 
@@ -68,34 +70,34 @@ vaccines = Vaccine(austin,
 # Toggle True/False or specify values for customization
 
 # Change to False if sample paths have already been generated
-need_sample_paths = False
+need_sample_paths = True
 
 # Different than num_processors_evaluation because
 #   num_processors_sample_path is used for naming/distinguishing
 #   states .json files
-num_processors_sample_paths = 300
+num_processors_sample_paths = 1
 sample_paths_generated_per_processor = 1
 
 # Change to False if evaluation is already done
 need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 200
+num_reps_evaluated_per_policy = 1
 
 # Reps offset
 # Rep number to start on
-reps_offset = 100
+reps_offset = 0
 
 # If True, only test 2 policies
-using_test_set_only = False
+using_test_set_only = True
 
 # Change to True if also want to automatically parse files
-need_parse = True
+need_parse = False
 
 # Assume that the number of processors >= 4
 # When True, for parsing, will use 4 processors and give
 #   1 peak to each processor
-split_peaks_amongst_processors = True
+split_peaks_amongst_processors = False
 
 
 ###############################################################################
@@ -124,7 +126,7 @@ if need_sample_paths:
     #   sample paths earlier and begins evaluation, but other processors
     #   have not finished sample paths and thus their sample paths files do not
     #   yet exist, causing file read errors
-    comm.Barrier()
+    #comm.Barrier()
     if rank == 0:
         print("Sample path generation completed.")
 
@@ -334,7 +336,7 @@ if need_evaluation:
                                np.array(ICU_violation_patient_days_per_rep), delimiter=",")
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_surge_days.csv",
                                np.array(surge_days_per_rep), delimiter=",")
-    comm.Barrier()
+    #comm.Barrier()
     if rank == 0:
         print("Evaluation completed.")
 
