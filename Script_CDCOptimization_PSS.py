@@ -1,9 +1,10 @@
 ###############################################################################
 
-# Based off of Script_CDCOptimization.py
-
-# Simulating single-indicator policies and 2-indicator policies
-#   to do "coordinate descent"
+# Based off of Script_CDCOptimization_FinerGrid.py (and thus
+#   Script_CDCOptimization.py)
+# Comparing to "constant" (i.e. policy that has been simulated to death)
+#   in an embarrassingly parallel way -- no message passing or communication
+#   necessary
 
 ###############################################################################
 
@@ -68,8 +69,11 @@ sample_paths_generated_per_processor = 1
 # Change to False if evaluation is already done
 need_evaluation = True
 
+# Change to False if allowing 2 indicators
+single_indicator_policies = False
+
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 300
+num_reps_evaluated_per_policy = 100
 
 # Reps offset
 # Rep number to start on
@@ -77,15 +81,6 @@ reps_offset = 0
 
 # If True, only test 2 policies
 using_test_set_only = False
-
-# Change to True if also want to automatically parse files
-need_parse = True
-
-# Assume that the number of processors >= 4
-# When True, for parsing, will use 4 processors and give
-#   1 peak to each processor
-split_peaks_amongst_processors = False
-
 
 ###############################################################################
 
@@ -127,97 +122,66 @@ if need_sample_paths:
 #   and increment from that point until 30 or 40 per 100k
 # upper bound of 60% occupancy would suffice
 
-case_threshold = np.inf
+case_threshold = 200
 
 pre_vaccine_policies = []
 post_vaccine_policies = []
 
-# Single-indicator policies
+if single_indicator_policies:
+    non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                  (-1, 0, 1),
+                                                                                  (0, 51, 1),
+                                                                                  (0, 51, 1))
+    non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                 (-1, 0, 1),
+                                                                                 (0, .51, .01),
+                                                                                 (0, .51, .01))
+else:
+    non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                  (-1, 0, 1),
+                                                                                  (0, 10, 1),
+                                                                                  (17, 51, 1))
+    non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+                                                                                 (-1, 0, 1),
+                                                                                 (0, .2, 0.05),
+                                                                                 (0.25, 0.55, 0.05))
 
-non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                              (-1, 0, 1),
-                                                                              (0, 51, 1),
-                                                                              (0, 51, 1))
-non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                             (-1, 0, 1),
-                                                                             (0, .51, .01),
-                                                                             (0, .51, .01))
+if single_indicator_policies:
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-    staffed_thresholds = {"non_surge": (np.inf,
-                                        np.inf,
-                                        np.inf),
-                          "surge": (-1,
-                                    -1,
-                                    np.inf)}
-    pre_vaccine_policy = CDCTierPolicy(austin,
-                                       pre_vaccine_tiers,
-                                       case_threshold,
-                                       hosp_adm_thresholds,
-                                       staffed_thresholds)
-    post_vaccine_policy = CDCTierPolicy(austin,
-                                        post_vaccine_tiers,
-                                        case_threshold,
-                                        hosp_adm_thresholds,
-                                        staffed_thresholds)
-    pre_vaccine_policies.append(pre_vaccine_policy)
-    post_vaccine_policies.append(post_vaccine_policy)
-
-for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-    hosp_adm_thresholds = {"non_surge": (np.inf,
-                                         np.inf,
-                                         np.inf),
-                           "surge": (-1,
-                                     -1,
-                                     np.inf)}
-    staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                        non_surge_staffed_thresholds[3],
-                                        non_surge_staffed_thresholds[4]),
-                          "surge": (-1,
-                                    -1,
-                                    non_surge_staffed_thresholds[3])}
-
-    pre_vaccine_policy = CDCTierPolicy(austin,
-                                       pre_vaccine_tiers,
-                                       case_threshold,
-                                       hosp_adm_thresholds,
-                                       staffed_thresholds)
-    post_vaccine_policy = CDCTierPolicy(austin,
-                                        post_vaccine_tiers,
-                                        case_threshold,
-                                        hosp_adm_thresholds,
-                                        staffed_thresholds)
-    pre_vaccine_policies.append(pre_vaccine_policy)
-    post_vaccine_policies.append(post_vaccine_policy)
-
-# 2-indicator policies
-
-non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                              (-1, 0, 1),
-                                                                              (0, 10, 1),
-                                                                              (17, 51, 1))
-non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                             (-1, 0, 1),
-                                                                             (0, .2, 0.05),
-                                                                             (0.25, 0.55, 0.05))
-
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+        staffed_thresholds = {"non_surge": (np.inf,
+                                            np.inf,
+                                            np.inf),
+                              "surge": (-1,
+                                        -1,
+                                        np.inf)}
+        pre_vaccine_policy = CDCTierPolicy(austin,
+                                           pre_vaccine_tiers,
+                                           case_threshold,
+                                           hosp_adm_thresholds,
+                                           staffed_thresholds)
+        post_vaccine_policy = CDCTierPolicy(austin,
+                                            post_vaccine_tiers,
+                                            case_threshold,
+                                            hosp_adm_thresholds,
+                                            staffed_thresholds)
+        pre_vaccine_policies.append(pre_vaccine_policy)
+        post_vaccine_policies.append(post_vaccine_policy)
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
 
+        hosp_adm_thresholds = {"non_surge": (np.inf,
+                                             np.inf,
+                                             np.inf),
+                               "surge": (-1,
+                                         -1,
+                                         np.inf)}
         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
                                             non_surge_staffed_thresholds[3],
                                             non_surge_staffed_thresholds[4]),
@@ -237,12 +201,42 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                             staffed_thresholds)
         pre_vaccine_policies.append(pre_vaccine_policy)
         post_vaccine_policies.append(post_vaccine_policy)
+else:
+    # both indicators but compare to single-indicator solutions that were feasible
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+
+        for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+
+            staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                                non_surge_staffed_thresholds[3],
+                                                non_surge_staffed_thresholds[4]),
+                                  "surge": (-1,
+                                            -1,
+                                            non_surge_staffed_thresholds[3])}
+
+            pre_vaccine_policy = CDCTierPolicy(austin,
+                                               pre_vaccine_tiers,
+                                               case_threshold,
+                                               hosp_adm_thresholds,
+                                               staffed_thresholds)
+            post_vaccine_policy = CDCTierPolicy(austin,
+                                                post_vaccine_tiers,
+                                                case_threshold,
+                                                hosp_adm_thresholds,
+                                                staffed_thresholds)
+            pre_vaccine_policies.append(pre_vaccine_policy)
+            post_vaccine_policies.append(post_vaccine_policy)
 
 if using_test_set_only:
     pre_vaccine_policies = pre_vaccine_policies[:2]
     post_vaccine_policies = post_vaccine_policies[:2]
-
-# breakpoint()
 
 ###############################################################################
 
@@ -318,13 +312,9 @@ if need_evaluation:
             else:
                 policy = post_vaccine_policies[policy_id]
 
-            cost_per_rep = []
-            feasibility_per_rep = []
-            stage1_days_per_rep = []
             stage2_days_per_rep = []
             stage3_days_per_rep = []
             ICU_violation_patient_days_per_rep = []
-            surge_days_per_rep = []
 
             rep_counter = 0
 
@@ -364,90 +354,3 @@ if need_evaluation:
         print("Evaluation completed.")
 
 ###############################################################################
-
-# Step 6: parsing
-
-# Create 2 sets of dataframes
-# Set A: 1 dataframe for each policy -- columns are cost, feasibility,
-#   ICU patient-days violation, stage1 days, stage2 days, stage3 days
-#   (each of the 6 performance measures), rows are replications
-# Set B: 1 dataframe for each performance measure, -- columns are
-#   policies, rows are replications
-
-# Edit: kept the functionality to generate Set A, but
-#   it's quite slow, and Set B is more useful. Plus Set A can be
-#   generated from Set B, so it's unnecessary.
-
-need_set_A = False
-
-if need_parse:
-    for peak in np.arange(4):
-
-        if split_peaks_amongst_processors:
-            if rank >= 4:
-                break
-            else:
-                peak = rank
-
-        # Set A
-        # policy_dict is a dictionary of dictionaries to contain
-        #   performance measures for each policy
-        if need_set_A:
-            policy_dict = {}
-
-        # Set B
-        cost_dict = {}
-        feasibility_dict = {}
-        ICU_violation_patient_days_dict = {}
-        stage1_days_dict = {}
-        stage2_days_dict = {}
-        stage3_days_dict = {}
-        surge_days_dict = {}
-
-        performance_measures_dicts = [cost_dict, feasibility_dict, ICU_violation_patient_days_dict,
-                                      stage1_days_dict, stage2_days_dict, stage3_days_dict, surge_days_dict]
-
-        cost_filenames = glob.glob("peak" + str(peak) + "*cost.csv")
-        feasibility_filenames = glob.glob("peak" + str(peak) + "*feasibility.csv")
-        ICU_violation_patient_days_filenames = glob.glob("peak" + str(peak) + "*ICU_violation_patient_days.csv")
-        stage1_days_filenames = glob.glob("peak" + str(peak) + "*stage1_days.csv")
-        stage2_days_filenames = glob.glob("peak" + str(peak) + "*stage2_days.csv")
-        stage3_days_filenames = glob.glob("peak" + str(peak) + "*stage3_days.csv")
-        surge_days_filenames = glob.glob("peak" + str(peak) + "*surge_days.csv")
-
-        num_performance_measures = len(performance_measures_dicts)
-
-        performance_measures_filenames = [cost_filenames, feasibility_filenames, ICU_violation_patient_days_filenames,
-                                          stage1_days_filenames, stage2_days_filenames, stage3_days_filenames,
-                                          surge_days_filenames]
-
-        # These become the column names for dataframes in Set A
-        performance_measures_strs = ["cost", "feasibility", "icu_violation_patient_days",
-                                     "stage1_days", "stage2_days", "stage3_days", "surge_days"]
-
-        # Open each .csv file and store its contents in various dataframes
-        for performance_measures_id in range(num_performance_measures):
-            for filename in performance_measures_filenames[performance_measures_id]:
-                df = pd.read_csv(filename, header=None)
-                policy_id = int(filename.split("peak" + str(peak) + "_policy")[-1].split("_")[0])
-
-                if need_set_A:
-                    if policy_id in policy_dict.keys():
-                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
-                    else:
-                        policy_dict[policy_id] = {}
-                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
-
-                performance_measures_dicts[performance_measures_id][policy_id] = np.asarray(df[0])
-
-        # Generate and export Set A dataframes
-        if need_set_A:
-            for key in policy_dict.keys():
-                df = pd.DataFrame(policy_dict[key])
-                df.to_csv("aggregated_peak" + str(peak) + "_policy" + str(key) + ".csv")
-
-        # Generate and export Set B dataframes
-        for performance_measures_id in range(num_performance_measures):
-            df = pd.DataFrame(performance_measures_dicts[performance_measures_id])
-            df.to_csv(
-                "aggregated_peak" + str(peak) + "_" + str(performance_measures_strs[performance_measures_id]) + ".csv")
