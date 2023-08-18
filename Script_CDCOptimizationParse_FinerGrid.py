@@ -1,11 +1,19 @@
 ###############################################################################
 #
-# LP's WIP parsing script scratchpad
+#
+#   _________________________________________________
+# ((                                                 ))
+#  ))     LP's WIP parsing script scratchpad ^_^    ((
+# ((                                                 ))
+#   -------------------------------------------------
+#
 # Based off of Script_CDCOptimizationParse.py
 
 # Note: make sure to change how many reps is in the denominator for feasibility
 #   -- depends on how many reps total
 
+# Doing unconstrained optimization right now
+#
 ###############################################################################
 
 import pandas as pd
@@ -14,6 +22,8 @@ import time
 import glob
 import itertools
 import matplotlib.pyplot as plt
+import matplotlib.patches as patches
+import matplotlib
 
 import seaborn as sns
 
@@ -21,6 +31,10 @@ from pathlib import Path
 
 base_path = Path(__file__).parent
 
+###############################################################################
+
+matplotlib.cm.get_cmap("magma_r").set_bad("white")
+matplotlib.cm.get_cmap("cool").set_bad("white")
 
 ###############################################################################
 
@@ -76,6 +90,8 @@ policies = []
 
 # Single-indicator policies
 # 2652 single-indicator policies
+# Hosp adm only: 51*26 = 1326 policies
+# Staffed beds only: same as above
 
 non_surge_hosp_adm_thresholds_array = thresholds_generator((-1, 0, 1),
                                                            (-1, 0, 1),
@@ -101,6 +117,10 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                     np.inf)}
     policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
+# print(len(non_surge_hosp_adm_thresholds_array))
+# print(len(non_surge_staffed_thresholds_array))
+# print(len(policies))
+
 for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
     hosp_adm_thresholds = {"non_surge": (np.inf,
                                          np.inf,
@@ -115,6 +135,8 @@ for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
                                     -1,
                                     non_surge_staffed_thresholds[3])}
     policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+
+# print(len(policies))
 
 # 2-indicator policies
 
@@ -146,8 +168,6 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                         non_surge_staffed_thresholds[3])}
         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
-breakpoint()
-
 ###############################################################################
 
 
@@ -159,7 +179,6 @@ def make_weighted_sum(df1, df2, df3, df4, weight1, weight2, weight3, weight4):
     summed_df = weighted_df1.add(weighted_df2, axis=1).add(weighted_df3, axis=1).add(weighted_df4, axis=1)
     return summed_df
 
-
 def find_optimal_weighted_sum(summed_df):
     min_val = summed_df.mean().iloc[summed_df.mean().argmin()]
     min_ix = int(summed_df.mean().index[summed_df.mean().argmin()])
@@ -170,34 +189,23 @@ def find_optimal_weighted_sum(summed_df):
 
 # Read data from all 4 peaks and store into dictionaries
 
-stage1_days_dict = {}
 stage2_days_dict = {}
 stage3_days_dict = {}
 ICU_violation_patient_days_dict = {}
-feasibility_dict = {}
 
-for peak in np.arange(4):
-    stage1_days_df = pd.read_csv(
-        base_path / "Results_07242023_singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage1_days.csv"),
-        index_col=0)
+for peak in np.arange(1):
     stage2_days_df = pd.read_csv(
-        base_path / "Results_07242023_singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
+        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
         index_col=0)
     stage3_days_df = pd.read_csv(
-        base_path / "Results_07242023_singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
+        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
         index_col=0)
-    ICU_violation_patient_days_df = pd.read_csv(base_path / "Results_07242023_singleindicator_aggregated" /
+    ICU_violation_patient_days_df = pd.read_csv(base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" /
                                                 ("aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv"),
                                                 index_col=0)
-    feasibility_df = pd.read_csv(
-        base_path / "Results_07242023_singleindicator_aggregated" / ("aggregated_peak" + str(peak) + "_feasibility.csv"),
-        index_col=0)
-    stage1_days_dict[str(peak)] = stage1_days_df
     stage2_days_dict[str(peak)] = stage2_days_df
     stage3_days_dict[str(peak)] = stage3_days_df
     ICU_violation_patient_days_dict[str(peak)] = ICU_violation_patient_days_df
-    feasibility_dict[str(peak)] = feasibility_df
-    # breakpoint()
 
 ###############################################################################
 
@@ -205,19 +213,27 @@ for peak in np.arange(4):
 
 # for w in [i for i in range(1, 11)] + [1e2, 1e3, 1e4, 1e5, 1e6, 1e7, 1e8, 1e9, np.inf]:
 
-# Find weight that gives 95% constraint adherence
-for w in [1365.76]:
+# Peak 1 optimality gap
+# 94.6 (-1, 1, 18) (-1, 0.0, 0.49999999999999994) 1.5866666666666667 0.92
+# 94.8 (-1, 1, 17) (-1, 0.0, 0.44999999999999996) 0.20666666666666667 0.9633333333333334
+# --> Go with weight w = 94.8
+
+peaks_start_times = [93, 276, 502, 641]
+peaks_end_times = [215, 397, 625, 762]
+
+for w in [94.8]:
     cost_dfs_per_peak = []
     ICU_violation_patient_days_per_peak = []
     feasibility_dfs_per_peak = []
+    stage2_days_dfs_per_peak = []
+    stage3_days_dfs_per_peak = []
 
-    for peak in np.arange(4):
-        stage1_days_df = stage1_days_dict[str(peak)]
+    for peak in np.arange(1):
         stage2_days_df = stage2_days_dict[str(peak)]
         stage3_days_df = stage3_days_dict[str(peak)]
         ICU_violation_patient_days_df = ICU_violation_patient_days_dict[str(peak)]
 
-        feasibility_df = feasibility_dict[str(peak)]
+        stage1_days_df = peaks_end_times[peak] - peaks_start_times[peak] - stage2_days_df.add(stage3_days_df, axis=1)
 
         cost_df = make_weighted_sum(stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
                                     1, 10, 100, w)
@@ -225,26 +241,357 @@ for w in [1365.76]:
 
         ICU_violation_patient_days_per_peak.append(ICU_violation_patient_days_df)
 
-        feasibility_dfs_per_peak.append(feasibility_df)
+        stage2_days_dfs_per_peak.append(stage2_days_df)
+        stage3_days_dfs_per_peak.append(stage3_days_df)
+
         # print(cost_df.mean().mean())
 
     cost_df_across_peaks = pd.concat(cost_dfs_per_peak)
     ICU_violation_patient_days_across_peaks = pd.concat(ICU_violation_patient_days_per_peak)
     optimal_val, optimal_ix, optimal_policy = find_optimal_weighted_sum(cost_df_across_peaks)
-
-    feasibility_dfs_across_peaks = pd.concat(feasibility_dfs_per_peak)
-
-    # 1/0 depending on if feasible across all peaks
-    feasibility_all_peaks = feasibility_dfs_per_peak[0] + feasibility_dfs_per_peak[1] + \
-                            feasibility_dfs_per_peak[2] + feasibility_dfs_per_peak[3]
-    feasibility_all_peaks = feasibility_all_peaks[feasibility_all_peaks >= 4]
+    stage2_days_df_across_peaks = pd.concat(stage2_days_dfs_per_peak)
+    stage3_days_df_across_peaks = pd.concat(stage3_days_dfs_per_peak)
 
     print(w, optimal_policy[1]["non_surge"], optimal_policy[2]["non_surge"],
-          ICU_violation_patient_days_across_peaks.mean()[str(optimal_ix)],
-          feasibility_all_peaks.sum()[str(optimal_ix)] / 400)
+          ICU_violation_patient_days_across_peaks.mean()[str(optimal_ix)], (ICU_violation_patient_days_df == 0).mean()[str(optimal_ix)])
 
+# To get constraint adherence probability
+# (ICU_violation_patient_days_df == 0).mean()
+
+breakpoint()
+
+###############################################################################
+
+# CDC policy for hospital admissions
+
+# full_df[(np.abs(full_df["hosp1"] - 10) < 1e-3) & (np.abs(full_df["hosp2"] - 20) < 1e-3)]
+
+###############################################################################
+
+# Coordinate descent stuff
+
+# Optimal single indicator hospital beds only policy is (3, 17)
+# Optimal single indicator staffed beds only policy is (0.04, 0.25)
+
+non_surge_hosp_adm_first_thresholds = []
+non_surge_staffed_first_thresholds = []
+
+for i in range(len(policies)):
+    non_surge_hosp_adm_first_thresholds.append(policies[i][1]["non_surge"][1])
+    non_surge_staffed_first_thresholds.append(policies[i][2]["non_surge"][1])
+
+non_surge_hosp_adm_second_thresholds = []
+non_surge_staffed_second_thresholds = []
+
+for i in range(len(policies)):
+    non_surge_hosp_adm_second_thresholds.append(policies[i][1]["non_surge"][2])
+    non_surge_staffed_second_thresholds.append(policies[i][2]["non_surge"][2])
+
+# There's some wonky business with the column names
+# This is not a problem for the single-indicator ordering because that is from 0 to 2652
+# And also not a problem for computing the unconstrained optimal because we use indexing
+# But it does present a problem for the 2-indicator heatmaps
+# For the 2-indicator heatmaps we want the columns in numerical order 0, 1, 2, 3, ...
+#   so that it matches up with the order of policies
+# But cost_df_across_peaks columns are lexsorted as strings "0", "1", "10", etc...
+# So here we reorder the columns of cost_df_across_peaks
+
+cost_df_across_peaks.columns = cost_df_across_peaks.columns.astype("int")
+
+cost_array_index_corrected = np.array(cost_df_across_peaks[cost_df_across_peaks.columns.sort_values()].mean())
+
+cost_array_index_corrected_standarderror = np.array(cost_df_across_peaks[cost_df_across_peaks.columns.sort_values()].sem())
+
+# Also have to do the same with days in yellow and days in red and ICU patient days violation
+
+stage2_days_df_across_peaks.columns = stage2_days_df_across_peaks.columns.astype("int")
+stage3_days_df_across_peaks.columns = stage3_days_df_across_peaks.columns.astype("int")
+ICU_violation_patient_days_across_peaks.columns = ICU_violation_patient_days_across_peaks.columns.astype("int")
+
+stage2_days_index_corrected =  np.array(stage2_days_df_across_peaks[stage2_days_df_across_peaks.columns.sort_values()].mean())
+stage2_days_index_corrected_standarderror =  np.array(stage2_days_df_across_peaks[stage2_days_df_across_peaks.columns.sort_values()].sem())
+
+stage3_days_index_corrected =  np.array(stage3_days_df_across_peaks[stage3_days_df_across_peaks.columns.sort_values()].mean())
+stage3_days_index_corrected_standarderror =  np.array(stage3_days_df_across_peaks[stage2_days_df_across_peaks.columns.sort_values()].sem())
+
+ICU_violation_patient_days_index_corrected =  np.array(ICU_violation_patient_days_across_peaks[ICU_violation_patient_days_across_peaks.columns.sort_values()].mean())
+ICU_violation_patient_days_index_corrected_standard_error =  np.array(ICU_violation_patient_days_across_peaks[ICU_violation_patient_days_across_peaks.columns.sort_values()].sem())
+
+full_df = pd.DataFrame({"cost": cost_array_index_corrected,
+                        "cost_sem": cost_array_index_corrected_standarderror,
+                        "stage2": stage2_days_index_corrected,
+                        "stage2_sem": stage2_days_index_corrected_standarderror,
+                        "stage3": stage3_days_index_corrected,
+                        "stage3_sem": stage3_days_index_corrected_standarderror,
+                        "violation": ICU_violation_patient_days_index_corrected,
+                        "hosp1": non_surge_hosp_adm_first_thresholds,
+                        "hosp2": non_surge_hosp_adm_second_thresholds,
+                        "beds1": non_surge_staffed_first_thresholds,
+                        "beds2": non_surge_staffed_second_thresholds})
+
+breakpoint()
+
+# Get top 10 policies by sample mean
+full_df.sort_values("cost")[:10]
+
+plt.clf()
+plt.scatter(full_df.sort_values("cost")[:100]["hosp2"], full_df.sort_values("cost")[:100]["beds2"])
+plt.show()
+
+plt.clf()
+plt.scatter(full_df.sort_values("cost")[:100]["hosp1"], full_df.sort_values("cost")[:100]["beds1"])
+plt.show()
+
+plt.clf()
+plt.scatter(full_df.sort_values("cost")[:100]["beds1"], full_df.sort_values("cost")[:100]["beds2"])
+plt.show()
+
+plt.clf()
+sns.kdeplot(data=full_df.sort_values("cost")[:100], x="beds1", y="beds2", cmap="mako_r", shade=True)
+plt.show()
+
+plt.clf()
+sns.kdeplot(data=full_df.sort_values("cost")[:100], x="hosp1", y="hosp2", cmap="mako_r", shade=True)
+plt.show()
+
+plt.clf()
+sns.kdeplot(data=full_df.sort_values("cost")[:100], x="hosp2", y="beds2", cmap="mako_r", shade=True)
+plt.show()
+
+breakpoint()
+
+###############################################################################
+
+# Coordinate descent stuff continued
+
+# Note sometimes e.g. for staffed beds with decimals -- the values do not match exactly
+#   so do np.abs(blahblah) < small number to match values (when looking up staffed beds thresholds)
+
+hosp_3_17_df = full_df[(full_df["hosp1"] == 3) & (full_df["hosp2"] == 17) & (full_df["beds1"] < np.inf)].copy(deep=True)
+hosp_3_17_df.sort_values(["beds1", "beds2"], inplace=True)
+
+# 4 x 7
+
+# Need to reshape into upper triangular array!
+base_array = np.full(28, 0)
+
+for i in np.arange(28):
+    base_array[i] = hosp_3_17_df["cost"].iloc[i]
+
+# This works!
+plt.clf()
+sns.heatmap(np.reshape(base_array, (4, 7)), xticklabels=hosp_3_17_df["beds2"].unique(), yticklabels=hosp_3_17_df["beds1"].unique(), cmap="magma_r")
+plt.title("Avg cost of days plus cost of ICU patient days violation")
+plt.show()
+
+breakpoint()
+
+beds_00_55_df = full_df[(np.abs(full_df["beds1"] - .00) < 1e-2) & (np.abs(full_df["beds2"] - .55) < 1e-2) & (full_df["hosp1"] < np.inf)].copy(deep=True)
+beds_00_55_df.sort_values(["hosp1", "hosp2"], inplace=True)
+
+# 10*34
+
+# Need to reshape into upper triangular array!
+base_array = np.full(10*34, 0)
+
+for i in np.arange(10*34):
+    base_array[i] = beds_00_55_df["cost"].iloc[i]
+
+# This works!
+plt.clf()
+sns.heatmap(np.reshape(base_array, (10, 34)), xticklabels=beds_00_55_df["hosp2"].unique(), yticklabels=beds_00_55_df["hosp1"].unique(), cmap="magma_r")
+plt.show()
+
+breakpoint()
+
+###############################################################################
+
+# Heat map for 2652 single-indicator policies
+# First 1326 policies are hosp adms only
+# Second 1326 policies are staffed beds only
+# First threshold: 51 options, second threshold: 26 options
+
+num_single_indicator_policies = 2652
+
+single_indicator_ix = [str(i) for i in range(num_single_indicator_policies)]
+
+single_indicator_cost_mean = np.asarray(cost_df_across_peaks[single_indicator_ix].mean())
+
+non_surge_hosp_adm_first_thresholds = []
+non_surge_staffed_first_thresholds = []
+
+for i in range(num_single_indicator_policies):
+    non_surge_hosp_adm_first_thresholds.append(policies[i][1]["non_surge"][1])
+    non_surge_staffed_first_thresholds.append(policies[i][2]["non_surge"][1])
+
+non_surge_hosp_adm_second_thresholds = []
+non_surge_staffed_second_thresholds = []
+
+for i in range(num_single_indicator_policies):
+    non_surge_hosp_adm_second_thresholds.append(policies[i][1]["non_surge"][2])
+    non_surge_staffed_second_thresholds.append(policies[i][2]["non_surge"][2])
+
+###############################################################################
+
+# # Hospital admissions only single-indicator policies
+#
+# df_hosp = pd.DataFrame({"cost": single_indicator_cost_mean[:1326],
+#                         "hosp1": non_surge_hosp_adm_first_thresholds[:1326],
+#                         "hosp2": non_surge_hosp_adm_second_thresholds[:1326],
+#                         "beds1": non_surge_staffed_first_thresholds[:1326],
+#                         "beds2": non_surge_staffed_second_thresholds[:1326]})
+#
+# # Need to reshape into upper triangular array!
+# base_array = np.full((51, 51), 0)
+# upper_triangular_indices = np.triu_indices(51, m=51)
+#
+# df_hosp.sort_values(by=["hosp1", "hosp2"], inplace=True)
+# cost = df_hosp["cost"]
+#
+#
+# for i in np.arange(1326):
+#     base_array[upper_triangular_indices[0][i]][upper_triangular_indices[1][i]] = cost[i]
+#
+# mask_array = np.full((51, 51), False, dtype="float")
+# mask_array[np.tril_indices(51, m=51)] = True
+
+#
+# # This works!
+# plt.clf()
+# sns.heatmap(base_array, cmap="magma_r", mask=mask_array)
+# plt.show()
+#
+# breakpoint()
+#
+# matplotlib.cm.get_cmap("magma_r").set_bad("white")
+#
+# smaller_array = base_array[:20,:20]
+# mask_array = np.full((20, 20), False)
+# mask_array[np.tril_indices(20, m=20)] = True
+#
+# for i in range(20):
+#     for j in range(20):
+#         if smaller_array[i][j] > 15000:
+#             mask_array[i][j] = True
+#
+# labels = np.full((20, 20), "", dtype="str")
+# labels[smaller_array == np.min(smaller_array[smaller_array > 0])] = "*"
+#
+# plt.clf()
+# sns.heatmap(smaller_array,
+#             xticklabels=np.arange(20),
+#             yticklabels=np.arange(20),
+#             cmap="magma_r",
+#             mask=mask_array,
+#             annot=labels,
+#             fmt="")
+# plt.show()
+#
+# breakpoint()
+#
+# labels = np.full((51, 51), "", dtype="str")
+# labels[base_array == np.min(base_array[base_array > 0])] = "*"
+#
+# # Heatmap with new color scale and same vmin/vmax as staffed beds only
+# # for comparison
+# plt.clf()
+# sns.heatmap(base_array, cmap="cool", mask=mask_array, vmin=1817, vmax=2145304, annot=labels, fmt="")
+# plt.show()
+#
 # breakpoint()
 
+
+##############################################################################
+
+# # Staffed beds only single-indicator policies
+#
+# df_beds = pd.DataFrame({"cost": single_indicator_cost_mean[1326:2652],
+#                         "hosp1": non_surge_hosp_adm_first_thresholds[1326:2652],
+#                         "hosp2": non_surge_hosp_adm_second_thresholds[1326:2652],
+#                         "beds1": non_surge_staffed_first_thresholds[1326:2652],
+#                         "beds2": non_surge_staffed_second_thresholds[1326:2652]})
+#
+# # Need to reshape into upper triangular array!
+# base_array = np.full((51, 51), 0)
+# upper_triangular_indices = np.triu_indices(51, m=51)
+#
+# df_beds.sort_values(by=["hosp1", "hosp2"], inplace=True)
+# cost = df_beds["cost"]
+#
+#
+# for i in np.arange(1326):
+#     base_array[upper_triangular_indices[0][i]][upper_triangular_indices[1][i]] = cost[i]
+#
+# mask_array = np.full((51, 51), False, dtype="float")
+# mask_array[np.tril_indices(51, m=51)] = True
+#
+# # This works!
+# plt.clf()
+# sns.heatmap(base_array,
+#             xticklabels=np.arange(50)/100,
+#             yticklabels=np.arange(50)/100,
+#             cmap="magma_r",
+#             mask=mask_array)
+# plt.show()
+#
+# breakpoint()
+#
+# matplotlib.cm.get_cmap("magma_r").set_bad("white")
+#
+# smaller_array = base_array[:20,:50]
+# mask_array = np.full((20, 50), False)
+# mask_array[np.tril_indices(20, m=50)] = True
+#
+# for i in range(20):
+#     for j in range(50):
+#         if smaller_array[i][j] > 15000:
+#             mask_array[i][j] = True
+#
+# labels = np.full((20, 50), "", dtype="str")
+# labels[smaller_array == np.min(smaller_array[smaller_array > 0])] = "*"
+#
+# plt.clf()
+# sns.heatmap(smaller_array,
+#             xticklabels=np.arange(50)/100,
+#             yticklabels=np.arange(20)/100,
+#             cmap="magma_r",
+#             mask=mask_array,
+#             annot=labels,
+#             fmt="")
+# plt.show()
+#
+# breakpoint()
+
+# Heatmap with new color scale and same vmin/vmax as staffed beds only
+#   for comparison
+# labels = np.full((51, 51), "", dtype="str")
+# labels[base_array == np.min(base_array[base_array > 0])] = "*"
+# plt.clf()
+# sns.heatmap(base_array, cmap="cool", mask=mask_array, vmin=1817, vmax=2145304, annot=labels, fmt="")
+# plt.show()
+#
+# breakpoint()
+
+###############################################################################
+
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+#
+#  / \-----------------------------------------------------,
+#  \_,|                                                    |
+#     | Old scripts I have not recently used below...      |
+#     |  ,--------------------------------------------------
+#     \_/__________________________________________________/
+#               \\     =o)
+#               (o>    /\\
+#               _(()_  _\_V_
+#               //     \\
+#                       \\
+###############################################################################
+###############################################################################
+###############################################################################
 ###############################################################################
 
 # non_surge_hosp_adm_first_thresholds = []
@@ -265,7 +612,7 @@ for w in [1365.76]:
 #
 # breakpoint()
 #
-# sns.color_palette("viridis", as_cmap=True)
+# sns.color_palette("magma", as_cmap=True)
 #
 # stage3_days = pd.concat(stage3_days_dict).mean()
 #
@@ -280,26 +627,26 @@ for w in [1365.76]:
 # # labels = np.reshape(labels, (10, 34))
 #
 # plt.clf()
-# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["cost"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["cost"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="magma_r")
 # plt.show()
 #
-# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["cost"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["cost"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="magma_r")
 #
 # plt.clf()
-# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["stage3_days"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["stage3_days"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="magma_r")
 # plt.show()
 #
-# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["stage3_days"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["stage3_days"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="magma_r")
 #
 # plt.clf()
-# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["ICU_violation_patient_days"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["ICU_violation_patient_days"].min()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="magma_r")
 # plt.show()
 #
-# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["ICU_violation_patient_days"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="viridis_r")
+# sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["ICU_violation_patient_days"].min()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="magma_r")
 #
-# # sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["cost"].mean()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="viridis_r")
+# # sns.heatmap(np.reshape(np.array(df.groupby(["hosp1", "hosp2"])["cost"].mean()), (10, 34)), xticklabels=df["hosp2"].unique(), yticklabels=df["hosp1"].unique(), cmap="magma_r")
 #
-# # sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["cost"].mean()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="viridis_r")
+# # sns.heatmap(np.reshape(np.array(df.groupby(["beds1", "beds2"])["cost"].mean()), (4, 7)), xticklabels=df["beds2"].unique(), yticklabels=df["beds1"].unique(), cmap="magma_r")
 #
 # # Okay also instead of mean... find best behaving
 #
@@ -319,131 +666,129 @@ for w in [1365.76]:
 # Weights (10^0, 10^1, and 10^2).
 # Then you make sure the solution stays the same when you change the weights to 10^0, 10^2, 10^4.
 
-performance_measures_strs = ["cost", "feasibility", "icu_violation_patient_days",
-                             "stage1_days", "stage2_days", "stage3_days"]
-
-min_cost_policies_per_peak = []
-min_cost_per_peak = []
-
-for peak in np.arange(4):
-
-    feasibility_df = feasibility_dict[str(peak)]
-
-    feasible_sols = feasibility_df.mean()[feasibility_df.mean() > 0.95].index
-
-    stage1_days_df = stage1_days_dict[str(peak)]
-    stage2_days_df = stage2_days_dict[str(peak)]
-    stage3_days_df = stage3_days_dict[str(peak)]
-    icu_violation_patient_days_df = ICU_violation_patient_days_dict[str(peak)]
-
-    cost_df = make_weighted_sum(stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
-                                1, 10, 100, 0)
-    cost_df = cost_df[feasible_sols]
-
-    print(feasibility_df.mean().max())
-    print(len(feasible_sols))
-
-    if len(feasible_sols) > 0:
-
-        min_cost = cost_df.mean().iloc[cost_df.mean().argmin()]
-        min_cost_ix = cost_df.mean().index[cost_df.mean().argmin()]
-        min_cost_policy = policies[int(min_cost_ix)]
-
-        min_cost_policies_per_peak.append(min_cost_policy)
-        min_cost_per_peak.append(min_cost)
-
-        print(min_cost_policy)
-
-        print(np.array(policies)[np.array(cost_df.mean().sort_values().index[:100].astype(int))])
-
-        breakpoint()
-
-    else:
-        min_cost_policies_per_peak.append(None)
-        min_cost_per_peak.append(np.inf)
+# performance_measures_strs = ["cost", "feasibility", "icu_violation_patient_days",
+#                              "stage1_days", "stage2_days", "stage3_days"]
+#
+# min_cost_policies_per_peak = []
+# min_cost_per_peak = []
+#
+# for peak in np.arange(4):
+#
+#     feasibility_df = feasibility_dict[str(peak)]
+#
+#     feasible_sols = feasibility_df.mean()[feasibility_df.mean() > 0.95].index
+#
+#     stage1_days_df = stage1_days_dict[str(peak)]
+#     stage2_days_df = stage2_days_dict[str(peak)]
+#     stage3_days_df = stage3_days_dict[str(peak)]
+#     icu_violation_patient_days_df = ICU_violation_patient_days_dict[str(peak)]
+#
+#     cost_df = make_weighted_sum(stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
+#                                 1, 10, 100, 0)
+#     cost_df = cost_df[feasible_sols]
+#
+#     print(feasibility_df.mean().max())
+#     print(len(feasible_sols))
+#
+#     if len(feasible_sols) > 0:
+#
+#         min_cost = cost_df.mean().iloc[cost_df.mean().argmin()]
+#         min_cost_ix = cost_df.mean().index[cost_df.mean().argmin()]
+#         min_cost_policy = policies[int(min_cost_ix)]
+#
+#         min_cost_policies_per_peak.append(min_cost_policy)
+#         min_cost_per_peak.append(min_cost)
+#
+#         print(min_cost_policy)
+#
+#         print(np.array(policies)[np.array(cost_df.mean().sort_values().index[:100].astype(int))])
+#
+#         breakpoint()
+#
+#     else:
+#         min_cost_policies_per_peak.append(None)
+#         min_cost_per_peak.append(np.inf)
 
 ###############################################################################
 
 # Find constrained optimization optimal across peaks
 
-feasible_sols_per_peak = []
-cost_dfs_per_peak = []
-
-for peak in np.arange(4):
-    feasibility_df = feasibility_dict[str(peak)]
-
-    feasible_sols = feasibility_df.mean()[feasibility_df.mean() > 0.95].index
-    feasible_sols_per_peak.append(feasible_sols)
-
-    stage1_days_df = stage1_days_dict[str(peak)]
-    stage2_days_df = stage2_days_dict[str(peak)]
-    stage3_days_df = stage3_days_dict[str(peak)]
-    icu_violation_patient_days_df = ICU_violation_patient_days_dict[str(peak)]
-
-    cost_df = make_weighted_sum(stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
-                                1, 10, 100, 0)
-    cost_dfs_per_peak.append(cost_df)
-
-cost_df_across_peaks = pd.concat(cost_dfs_per_peak)
-
-feasible_sols_across_peak = list(set.intersection(*[set(x) for x in feasible_sols_per_peak]))
-
-average_cost_across_peaks = cost_df_across_peaks[feasible_sols_across_peak].mean()
-
-min_cost = average_cost_across_peaks[average_cost_across_peaks.argmin()]
-min_cost_ix = average_cost_across_peaks.index[average_cost_across_peaks.argmin()]
-min_cost_policy = policies[int(min_cost_ix)]
-
-print("ACROSS PEAKS MIN COST POLICY")
-print(min_cost_policy)
-
-for peak in np.arange(4):
-    feasibility_df = feasibility_dict[str(peak)]
-    print(feasibility_df[min_cost_ix].mean())
-
-for peak in np.arange(4):
-    stage2_days_df = stage2_days_dict[str(peak)]
-    if peak == 0:
-        stage2_days_df_across_peaks = stage2_days_df
-    else:
-        stage2_days_df_across_peaks = stage2_days_df_across_peaks.add(stage2_days_df)
-
-    print(stage2_days_df[min_cost_ix].quantile(0.5))
-
-for peak in np.arange(4):
-    stage3_days_df = stage3_days_dict[str(peak)]
-    if peak == 0:
-        stage3_days_df_across_peaks = stage3_days_df
-    else:
-        stage3_days_df_across_peaks = stage3_days_df_across_peaks.add(stage3_days_df)
-
-    print(stage3_days_df[min_cost_ix].quantile(0.5))
-
-breakpoint()
+# feasible_sols_per_peak = []
+# cost_dfs_per_peak = []
+#
+# for peak in np.arange(4):
+#     feasibility_df = feasibility_dict[str(peak)]
+#
+#     feasible_sols = feasibility_df.mean()[feasibility_df.mean() > 0.95].index
+#     feasible_sols_per_peak.append(feasible_sols)
+#
+#     stage1_days_df = stage1_days_dict[str(peak)]
+#     stage2_days_df = stage2_days_dict[str(peak)]
+#     stage3_days_df = stage3_days_dict[str(peak)]
+#     icu_violation_patient_days_df = ICU_violation_patient_days_dict[str(peak)]
+#
+#     cost_df = make_weighted_sum(stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
+#                                 1, 10, 100, 0)
+#     cost_dfs_per_peak.append(cost_df)
+#
+# cost_df_across_peaks = pd.concat(cost_dfs_per_peak)
+#
+# feasible_sols_across_peak = list(set.intersection(*[set(x) for x in feasible_sols_per_peak]))
+#
+# average_cost_across_peaks = cost_df_across_peaks[feasible_sols_across_peak].mean()
+#
+# min_cost = average_cost_across_peaks[average_cost_across_peaks.argmin()]
+# min_cost_ix = average_cost_across_peaks.index[average_cost_across_peaks.argmin()]
+# min_cost_policy = policies[int(min_cost_ix)]
+#
+# print("ACROSS PEAKS MIN COST POLICY")
+# print(min_cost_policy)
+#
+# for peak in np.arange(4):
+#     feasibility_df = feasibility_dict[str(peak)]
+#     print(feasibility_df[min_cost_ix].mean())
+#
+# for peak in np.arange(4):
+#     stage2_days_df = stage2_days_dict[str(peak)]
+#     if peak == 0:
+#         stage2_days_df_across_peaks = stage2_days_df
+#     else:
+#         stage2_days_df_across_peaks = stage2_days_df_across_peaks.add(stage2_days_df)
+#
+#     print(stage2_days_df[min_cost_ix].quantile(0.5))
+#
+# for peak in np.arange(4):
+#     stage3_days_df = stage3_days_dict[str(peak)]
+#     if peak == 0:
+#         stage3_days_df_across_peaks = stage3_days_df
+#     else:
+#         stage3_days_df_across_peaks = stage3_days_df_across_peaks.add(stage3_days_df)
+#
+#     print(stage3_days_df[min_cost_ix].quantile(0.5))
+#
+# breakpoint()
 
 ###############################################################################
 
-# Get info on feasible policies
-
-feasible_sols_across_peak = np.asarray(feasible_sols_across_peak, dtype=int)
-np.asarray(policies)[feasible_sols_across_peak]
-
-feasible_non_surge_hosp_adm_thresholds = []
-feasible_non_surge_staffed_thresholds = []
-
-for policy in np.asarray(policies)[feasible_sols_across_peak]:
-    if policy[1]["non_surge"][0] < np.inf:
-        feasible_non_surge_hosp_adm_thresholds.append(policy[1]["non_surge"])
-    elif policy[2]["non_surge"][0] < np.inf:
-        feasible_non_surge_staffed_thresholds.append(policy[2]["non_surge"])
-
-feasible_non_surge_hosp_adm_thresholds.sort()
-feasible_non_surge_staffed_thresholds.sort()
-
-ix_increasing_cost_sorted = np.array(average_cost_across_peaks.sort_values().index, dtype=int)
-for ix in ix_increasing_cost_sorted:
-    if policies[ix][2]["non_surge"][0] != np.inf:
-        print(policies[ix])
+# feasible_sols_across_peak = np.asarray(feasible_sols_across_peak, dtype=int)
+# np.asarray(policies)[feasible_sols_across_peak]
+#
+# feasible_non_surge_hosp_adm_thresholds = []
+# feasible_non_surge_staffed_thresholds = []
+#
+# for policy in np.asarray(policies)[feasible_sols_across_peak]:
+#     if policy[1]["non_surge"][0] < np.inf:
+#         feasible_non_surge_hosp_adm_thresholds.append(policy[1]["non_surge"])
+#     elif policy[2]["non_surge"][0] < np.inf:
+#         feasible_non_surge_staffed_thresholds.append(policy[2]["non_surge"])
+#
+# feasible_non_surge_hosp_adm_thresholds.sort()
+# feasible_non_surge_staffed_thresholds.sort()
+#
+# ix_increasing_cost_sorted = np.array(average_cost_across_peaks.sort_values().index, dtype=int)
+# for ix in ix_increasing_cost_sorted:
+#     if policies[ix][2]["non_surge"][0] != np.inf:
+#         print(policies[ix])
 
 # non surge hosp adm threshold #1 must be <= 10
 # non surge staffed threshold #1 must be <= .12
@@ -454,73 +799,65 @@ for ix in ix_increasing_cost_sorted:
 # best staffed beds only policy
 # (200, {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)}, {'non_surge': (-1, 0.01, 0.25), 'surge': (-1, -1, 0.01)})
 
-breakpoint()
+###############################################################################
+
+# for peak in np.arange(4):
+#     print(np.average(stage3_days_dict[str(peak)].mean()[feasible_sols_across_peak]))
+#
+# for peak in np.arange(4):
+#     print(np.average(stage2_days_dict[str(peak)].mean()[feasible_sols_across_peak]))
 
 ###############################################################################
 
-for peak in np.arange(4):
-    print(np.average(stage3_days_dict[str(peak)].mean()[feasible_sols_across_peak]))
-
-for peak in np.arange(4):
-    print(np.average(stage2_days_dict[str(peak)].mean()[feasible_sols_across_peak]))
-
-breakpoint()
-
-# Get variances of number of days in yellow and red
-
-for peak in np.arange(4):
-    plt.clf()
-    plt.hist(stage2_days_dict[str(peak)].var()[feasible_sols_across_peak], color="gold")
-    plt.title("Sample variance of days in yellow for feasible policies for peak " + str(peak + 1))
-    plt.xlabel("Sample variance of days in yellow stage")
-    plt.ylabel("Number of policies")
-    plt.savefig("stage2_variance_peak" + str(peak + 1) + "_hist.png", dpi=1200)
-
-for peak in np.arange(4):
-    plt.clf()
-    plt.hist(stage3_days_dict[str(peak)].var()[feasible_sols_across_peak], color="red")
-    plt.title("Sample variance of days in red for feasible policies for peak " + str(peak + 1))
-    plt.xlabel("Sample variance of days in red stage")
-    plt.ylabel("Number of policies")
-    plt.savefig("stage3_variance_peak" + str(peak + 1) + "_hist.png", dpi=1200)
-
-breakpoint()
-
-for peak in np.arange(4):
-    plt.clf()
-    plt.hist(stage3_days_dict[str(peak)].mean()[feasible_sols_across_peak], color="red")
-    plt.title("Average days in red for feasible policies for peak " + str(peak + 1))
-    plt.xlabel("Average days in red stage")
-    plt.ylabel("Number of policies")
-    plt.savefig("stage3_peak" + str(peak + 1) + "_hist.png", dpi=1200)
-
-for peak in np.arange(4):
-    plt.clf()
-    plt.hist(stage2_days_dict[str(peak)].mean()[feasible_sols_across_peak], color="gold")
-    plt.title("Average days in yellow for feasible policies for peak " + str(peak + 1))
-    plt.xlabel("Average days in yellow stage")
-    plt.ylabel("Number of policies")
-    plt.savefig("stage2_peak" + str(peak + 1) + "_hist.png", dpi=1200)
-
-plt.clf()
-plt.hist(stage3_days_df_across_peaks.mean()[feasible_sols_across_peak], color="red")
-plt.title("Average across-peak days in red for feasible policies")
-plt.xlabel("Average across-peak days in red stage")
-plt.ylabel("Number of policies")
-plt.savefig("stage3_across_peaks_hist.png", dpi=1200)
-
-plt.clf()
-plt.hist(stage2_days_df_across_peaks.mean()[feasible_sols_across_peak], color="gold")
-plt.title("Average across-peak days in yellow for feasible policies")
-plt.xlabel("Average across-peak days in yellow stage")
-plt.ylabel("Number of policies")
-plt.savefig("stage2_across_peaks_hist.png", dpi=1200)
-
-plt.clf()
-plt.hist(average_cost_across_peaks[feasible_sols_across_peak])
-plt.title("Average monetary cost for feasible policies")
-plt.xlabel("Average monetary cost")
-plt.ylabel("Number of policies")
-plt.savefig("cost_across_peaks_hist.png", dpi=1200)
-
-breakpoint()
+# for peak in np.arange(4):
+#     plt.clf()
+#     plt.hist(stage2_days_dict[str(peak)].var()[feasible_sols_across_peak], color="gold")
+#     plt.title("Sample variance of days in yellow for feasible policies for peak " + str(peak + 1))
+#     plt.xlabel("Sample variance of days in yellow stage")
+#     plt.ylabel("Number of policies")
+#     plt.savefig("stage2_variance_peak" + str(peak + 1) + "_hist.png", dpi=1200)
+#
+# for peak in np.arange(4):
+#     plt.clf()
+#     plt.hist(stage3_days_dict[str(peak)].var()[feasible_sols_across_peak], color="red")
+#     plt.title("Sample variance of days in red for feasible policies for peak " + str(peak + 1))
+#     plt.xlabel("Sample variance of days in red stage")
+#     plt.ylabel("Number of policies")
+#     plt.savefig("stage3_variance_peak" + str(peak + 1) + "_hist.png", dpi=1200)
+#
+# for peak in np.arange(4):
+#     plt.clf()
+#     plt.hist(stage3_days_dict[str(peak)].mean()[feasible_sols_across_peak], color="red")
+#     plt.title("Average days in red for feasible policies for peak " + str(peak + 1))
+#     plt.xlabel("Average days in red stage")
+#     plt.ylabel("Number of policies")
+#     plt.savefig("stage3_peak" + str(peak + 1) + "_hist.png", dpi=1200)
+#
+# for peak in np.arange(4):
+#     plt.clf()
+#     plt.hist(stage2_days_dict[str(peak)].mean()[feasible_sols_across_peak], color="gold")
+#     plt.title("Average days in yellow for feasible policies for peak " + str(peak + 1))
+#     plt.xlabel("Average days in yellow stage")
+#     plt.ylabel("Number of policies")
+#     plt.savefig("stage2_peak" + str(peak + 1) + "_hist.png", dpi=1200)
+#
+# plt.clf()
+# plt.hist(stage3_days_df_across_peaks.mean()[feasible_sols_across_peak], color="red")
+# plt.title("Average across-peak days in red for feasible policies")
+# plt.xlabel("Average across-peak days in red stage")
+# plt.ylabel("Number of policies")
+# plt.savefig("stage3_across_peaks_hist.png", dpi=1200)
+#
+# plt.clf()
+# plt.hist(stage2_days_df_across_peaks.mean()[feasible_sols_across_peak], color="gold")
+# plt.title("Average across-peak days in yellow for feasible policies")
+# plt.xlabel("Average across-peak days in yellow stage")
+# plt.ylabel("Number of policies")
+# plt.savefig("stage2_across_peaks_hist.png", dpi=1200)
+#
+# plt.clf()
+# plt.hist(average_cost_across_peaks[feasible_sols_across_peak])
+# plt.title("Average monetary cost for feasible policies")
+# plt.xlabel("Average monetary cost")
+# plt.ylabel("Number of policies")
+# plt.savefig("cost_across_peaks_hist.png", dpi=1200)
