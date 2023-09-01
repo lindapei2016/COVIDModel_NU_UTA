@@ -147,10 +147,10 @@ hosp_adm_thresholds = {"non_surge": (-1,
 
 staffed_thresholds = {"non_surge": (-1,
                                     0.1,
-                                    0.2),
+                                    0.15),
                       "surge": (-1,
                                 -1,
-                                0.1)}
+                                0.15)}
 
 pre_vaccine_policy = CDCTierPolicy(austin,
                                    pre_vaccine_tiers,

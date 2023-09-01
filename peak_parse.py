@@ -17,30 +17,72 @@ base_path = Path(__file__).parent
 
 ###############################################################################
 
-# This operates on combined individual CDC implementation files
+# Combine the individual CDC implementation files
+# Want to preserve order so that reps1-300 are in order for "CRN" / common sample path stuff
+
+# FYI have to move finished files to relevant folder used in next code chunk
+
+ICU_violation_patient_days_dict = {}
+stage2_days_dict = {}
+stage3_days_dict = {}
+
+for peak in np.arange(2,4):
+
+    ICU_violation_patient_days_data = []
+    stage2_days_data = []
+    stage3_days_data = []
+
+    for rank in np.arange(30):
+        ICU_violation_patient_days_data.append(pd.read_csv("Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" +
+                                                           "/" + "rank" + str(rank) + "_peak" + str(peak) +
+                                                           "_policyCDCimplementation" +
+                                                           "_ICU_violation_patient_days.csv", header=None))
+        stage2_days_data.append(pd.read_csv("Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" +
+                                            "/" + "rank" + str(rank) + "_peak" + str(peak) +
+                                            "_policyCDCimplementation" +
+                                            "_stage2_days.csv", header=None))
+        stage3_days_data.append(pd.read_csv("Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" +
+                                            "/" + "rank" + str(rank) + "_peak" + str(peak) +
+                                            "_policyCDCimplementation" +
+                                            "_stage3_days.csv", header=None))
+
+    ICU_violation_patient_days_dict[peak] = pd.concat(ICU_violation_patient_days_data, axis=0).reset_index()[0]
+    stage2_days_dict[peak] = pd.concat(stage2_days_data, axis=0).reset_index()[0]
+    stage3_days_dict[peak] = pd.concat(stage3_days_data, axis=0).reset_index()[0]
+
+for peak in np.arange(2,4):
+    ICU_violation_patient_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_ICU_violation_patient_days.csv")
+    stage2_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_stage2_days.csv")
+    stage3_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_stage3_days.csv")
+
+breakpoint()
+
+###############################################################################
+
+# This operates on combined CDC implementation files
 # Adds them (CDC implemented policy is policy #12172)
 
-for peak in np.arange(2):
+for peak in np.arange(2,4):
     stage2_days_df = pd.read_csv(
-        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
+        base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage2_days.csv"),
         index_col=0)
     stage3_days_df = pd.read_csv(
-        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
+        base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / ("aggregated_peak" + str(peak) + "_stage3_days.csv"),
         index_col=0)
-    ICU_violation_patient_days_df = pd.read_csv(base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" /
+    ICU_violation_patient_days_df = pd.read_csv(base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" /
                                                 ("aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv"),
                                                 index_col=0)
 
     CDC_implementation_stage2_days_df = pd.read_csv(
-        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / (
+        base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / (
                     "peak" + str(peak) + "_policy12172_stage2_days.csv"),
         index_col=0)
     CDC_implementation_stage3_days_df = pd.read_csv(
-        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / (
+        base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" / (
                     "peak" + str(peak) + "_policy12172_stage3_days.csv"),
         index_col=0)
     CDC_implementation_ICU_violation_patient_days_df = pd.read_csv(
-        base_path / "NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" /
+        base_path / "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps" /
         ("peak" + str(peak) + "_policy12172_ICU_violation_patient_days.csv"),
         index_col=0)
 
@@ -48,53 +90,23 @@ for peak in np.arange(2):
     CDC_implementation_stage3_days_df.rename(columns={"0": "12172"}, inplace=True)
     CDC_implementation_ICU_violation_patient_days_df.rename(columns={"0": "12172"}, inplace=True)
 
-    CDC_implementation_stage2_days_df.reset_index(inplace=True)
-    CDC_implementation_stage3_days_df.reset_index(inplace=True)
-    CDC_implementation_ICU_violation_patient_days_df.reset_index(inplace=True)
+    # CDC_implementation_stage2_days_df.reset_index(inplace=True)
+    # CDC_implementation_stage3_days_df.reset_index(inplace=True)
+    # CDC_implementation_ICU_violation_patient_days_df.reset_index(inplace=True)
 
     new_stage2_days_df = pd.concat((stage2_days_df, CDC_implementation_stage2_days_df["12172"]), axis=1)
     new_stage3_days_df = pd.concat((stage3_days_df, CDC_implementation_stage3_days_df["12172"]), axis=1)
     new_ICU_violation_patient_days_df = pd.concat((ICU_violation_patient_days_df, CDC_implementation_ICU_violation_patient_days_df["12172"]), axis=1)
 
-    breakpoint()
-
-###############################################################################
-
-# Combine the individual CDC implementation files
-# Want to preserve order so that reps1-300 are in order for "CRN" / common sample path stuff
-
-ICU_violation_patient_days_dict = {}
-stage2_days_dict = {}
-stage3_days_dict = {}
-
-for peak in np.arange(4):
-
-    ICU_violation_patient_days_data = []
-    stage2_days_data = []
-    stage3_days_data = []
-
-    for rank in np.arange(30):
-        ICU_violation_patient_days_data.append(pd.read_csv("NoCaseThreshold_CDCImplementation_300Reps" +
-                                                           "/" + "rank" + str(rank) + "_peak" + str(peak) +
-                                                           "_policyCDCimplementation" +
-                                                           "_ICU_violation_patient_days.csv", header=None))
-        stage2_days_data.append(pd.read_csv("NoCaseThreshold_CDCImplementation_300Reps" +
-                                            "/" + "rank" + str(rank) + "_peak" + str(peak) +
-                                            "_policyCDCimplementation" +
-                                            "_stage2_days.csv", header=None))
-        stage3_days_data.append(pd.read_csv("NoCaseThreshold_CDCImplementation_300Reps" +
-                                            "/" + "rank" + str(rank) + "_peak" + str(peak) +
-                                            "_policyCDCimplementation" +
-                                            "_stage3_days.csv", header=None))
-
-    ICU_violation_patient_days_dict[peak] = pd.concat(ICU_violation_patient_days_data, axis=0)
-    stage2_days_dict[peak] = pd.concat(stage2_days_data, axis=0)
-    stage3_days_dict[peak] = pd.concat(stage3_days_data, axis=0)
-
-for peak in np.arange(4):
-    ICU_violation_patient_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_ICU_violation_patient_days.csv")
-    stage2_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_stage2_days.csv")
-    stage2_days_dict[peak].to_csv("peak" + str(peak) + "_policy" + str(12172) + "_stage3_days.csv")
+    new_stage2_days_df.to_csv(
+        "aggregated_with_CDCimplementation_peak" +
+        str(peak) + "_stage2_days.csv")
+    new_stage3_days_df.to_csv(
+        "aggregated_with_CDCimplementation_peak" +
+        str(peak) + "_stage3_days.csv")
+    new_ICU_violation_patient_days_df.to_csv(
+        "aggregated_with_CDCimplementation_peak" +
+        str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()
 
