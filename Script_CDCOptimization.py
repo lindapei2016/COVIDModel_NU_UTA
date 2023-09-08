@@ -31,7 +31,7 @@ import pandas as pd
 import numpy as np
 import glob
 
-#from mpi4py import MPI
+from mpi4py import MPI
 from pathlib import Path
 
 base_path = Path(__file__).parent

@@ -130,7 +130,7 @@ for peak in np.arange(4):
         new_rep.rng = np.random.Generator(bit_generator)
 
         cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days \
-                = evaluate_one_policy_one_sample_path_WA(policy, new_rep, end_time)
+            = evaluate_one_policy_one_sample_path_WA(policy, new_rep, end_time)
         cost_per_rep.append(cost)
         feasibility_per_rep.append(feasibility)
         stage1_days_per_rep.append(stage1_days)
@@ -154,7 +154,6 @@ for peak in np.arange(4):
                        np.array(stage3_days_per_rep), delimiter=",")
             np.savetxt("peak" + str(peak) + "_policyWA" + "_ICU_violation_patient_days.csv",
                        np.array(ICU_violation_patient_days_per_rep), delimiter=",")
-
 
 ###############################################################################
 """
