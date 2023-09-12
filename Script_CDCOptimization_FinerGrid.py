@@ -1,9 +1,16 @@
 ###############################################################################
 
-# Based off of Script_CDCOptimization.py
-
-# Simulating single-indicator policies and 2-indicator policies
-#   to do "coordinate descent"
+# This script contains beginning-to-end sample path generation
+#   and evaluation of CDC policies. User can specify which CDC policies
+#   they would like to evaluate.
+# Can split up sample path generation and policy evaluation on
+#   parallel processors using ''mpi4py.''
+# The number of sample paths generated (and number of replications
+#   that each policy is evaluated on) is
+#       num_processors_evaluation x sample_paths_generated_per_processor
+#           (num_processors_evaluation) is inferred from mpi call
+#           (sample_paths_generated_per_processor is a variable that is
+#       specified in the code)
 
 ###############################################################################
 

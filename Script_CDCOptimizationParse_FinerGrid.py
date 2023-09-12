@@ -485,7 +485,102 @@ else:
 
 breakpoint()
 
+# KN for every peak and also for across-peak
+# Then get additional simulation output for these systems
+# Maybe run bi-PASS with unconstrained objective function?
+#   ^ But maybe not if the number of systems is small
+
+c = 1
+alpha = 0.05/2
+n0 = 300
+
+# Here r is the number of replications and it happens
+#   to be the same as n0 for our case
+r = n0
+k = 12172
+
+eta = (1/2)*(((2 * alpha)/(k-1))**(-2/(n0-1)) - 1)
+hsquared = 2 * c * eta * (n0 - 1)
+
+# 1 day in red? or 1 patient day violation? think about...
+# iz_param = 540
+
+iz_param = 1
+
+# Also, idea is to do the pairwise comparisons more intelligently for KN
+# Compare policies to best sample mean policy and then eliminate policies
+# Then compare surviving policies to 2nd best sample mean policy and eliminate
+#   and so on...
+# Right now doing KN where top 100 policies are compared to other policies
+#   rather than do O(10k^2) comparisons
+
+for peak in np.arange(4):
+
+    eliminated_policies_ix = []
+
+    # Change to 12712 (total num policies) to do full KN
+    for i in range(100):
+
+        eliminated_policies_ix = set(eliminated_policies_ix)
+        eliminated_policies_ix = list(eliminated_policies_ix)
+
+        min_cost_ix_peak = full_df_dict[str(peak)].sort_values("cost").index[i]
+
+        min_cost_stage3_days_peak = stage3_days_dict[str(peak)][str(min_cost_ix_peak)]
+
+        var_of_diff_dict = {}
+
+        for col in stage3_days_dict[str(peak)].columns:
+            var_of_diff = np.sum((stage3_days_dict[str(peak)][col] -
+                                  min_cost_stage3_days_peak -
+                                  (stage3_days_dict[str(peak)][col].mean() -
+                                   min_cost_stage3_days_peak.mean()))**2)/(n0-1)
+            var_of_diff_dict[col] = var_of_diff
+
+        comparison_mean = min_cost_stage3_days_peak.mean()
+
+        for col in stage3_days_dict[str(peak)].columns:
+            if col == str(min_cost_ix_peak):
+                continue
+            elif col in eliminated_policies_ix:
+                continue
+            else:
+                wiggle_room = max(0, (iz_param / (2*c*r)) * (hsquared * var_of_diff_dict[col] / iz_param**2 - r))
+                if stage3_days_dict[str(peak)][col].mean() < comparison_mean - wiggle_room:
+                    eliminated_policies_ix.append(col)
+
+    # print(len(eliminated_policies_ix))
+
+    non_eliminated_policies = set(stage3_days_dict[str(peak)].columns).difference(set(eliminated_policies_ix))
+    feasible_policies = set(full_df_dict[str(peak)][full_df_dict[str(peak)].feasibility > 0.95].index.astype(str))
+    non_eliminated_feasible_policies = list(non_eliminated_policies.intersection(feasible_policies))
+
+    np.savetxt("non_eliminated_feasible_policies_peak" + str(peak) + ".csv",
+               np.array(non_eliminated_feasible_policies).astype(int))
+
+
 ###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+#
+#  / \-----------------------------------------------------,
+#  \_,|                                                    |
+#     |   Selected old subroutines and notes               |
+#     |   Work in progress: organizing following code      |
+#     |  ,--------------------------------------------------
+#     \_/__________________________________________________/
+#               \\     =o)
+#               (o>    /\\
+#               _(()_  _\_V_
+#               //     \\
+#                       \\
+###############################################################################
+###############################################################################
+###############################################################################
+###############################################################################
+
+breakpoint()
 
 # Paired t-tests
 # TODO: this section is a work in progress!
@@ -497,7 +592,12 @@ breakpoint()
 # For each peak, ix of policy with lowest cost sample mean
 lowest_cost_ix_dict = {}
 for peak in np.arange(4):
-    lowest_cost_ix_dict[str(peak)] = full_df_dict[str(peak)].sort_values("cost").index[0]
+    ls = []
+    ls.append(full_df_dict[str(peak)].sort_values("cost").index[0])
+    ls.append(full_df_dict[str(peak)][full_df_dict[str(peak)].beds1 == np.inf].sort_values("cost").index[0])
+    ls.append(full_df_dict[str(peak)][full_df_dict[str(peak)].hosp1 == np.inf].sort_values("cost").index[0])
+    ls.append(full_df_dict[str(0)][full_df_dict["0"].beds1 < np.inf][full_df_dict["0"].hosp1 < np.inf].sort_values("cost").index[0])
+    lowest_cost_ix_dict[peak] = set(ls)
 
 # Across-peak ix of policy with lowest cost sample mean is lowest_cost_ix
 
@@ -515,7 +615,7 @@ sum_cost_df_all_peaks = cost_df_all_peaks[:300] + \
 # Alternative argument defines alternative hypothesis!
 # t-statistic is negative which makes sense -- a < b
 
-# for peak in np.arange(4):
+breakpoint()
 
 scipy.stats.ttest_ind(np.array(cost_df_all_peaks[lowest_cost_ix]), np.array(cost_df_all_peaks[12172]),
                       equal_var=False, alternative="greater")
@@ -710,26 +810,6 @@ breakpoint()
 
 # Can add vmin and vmax to heatmap to specify min/max values
 
-###############################################################################
-
-###############################################################################
-###############################################################################
-###############################################################################
-###############################################################################
-#
-#  / \-----------------------------------------------------,
-#  \_,|                                                    |
-#     |   Selected old subroutines and notes               |
-#     |  ,--------------------------------------------------
-#     \_/__________________________________________________/
-#               \\     =o)
-#               (o>    /\\
-#               _(()_  _\_V_
-#               //     \\
-#                       \\
-###############################################################################
-###############################################################################
-###############################################################################
 ###############################################################################
 
 # No longer used -- scatterplots, but those suffer from overplotting
