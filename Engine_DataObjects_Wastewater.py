@@ -373,6 +373,10 @@ class City:
     def load_fixed_viral_shedding_param(self, viral_shedding_profile_end_date, viral_shedding_param):
         if self.flag_wastewater_sim is False:
             self.flag_wastewater_sim = True
+        # reset Sep. 11, Sonny, fix the issue when city object is reused in the forward backward parameter tuning
+        self.viral_shedding_profile["param"] = []
+        self.viral_shedding_profile["val"] = []
+        #
         for i in range(len(viral_shedding_param)):
             cur_vsp = {"end_date": 0, "param": []}
             cur_vsp["end_date"] = viral_shedding_profile_end_date[i]
