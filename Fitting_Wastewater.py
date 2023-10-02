@@ -120,6 +120,10 @@ class ParameterFitting:
         """
         Function that runs the parameter fitting.
         """
+        # debug
+        #print(self.city.viral_shedding_profile["param"])
+        #print("time: " + self.city.viral_shedding_profile["param"][0]["end_date"].strftime("%m/%d/%Y"))
+        #print([self.city.viral_shedding_profile["param"][0]["end_date"].strftime("%m/%d/%Y")])
         # add time stamps for computing time elapsed
         start = time.time()
         res = self.least_squares_fit()
@@ -247,6 +251,8 @@ class ParameterFitting:
                 num_shedding_days = self.city.viral_shedding_profile["num_days"]
                 vsp_param = x_variables[idx:(idx + self.vsp_num_fit_param)]
                 rel_idx += self.vsp_num_fit_param
+                vsp_param_full = []
+                vsp_end_dates_full = []
                 if path is not None:
                     writeSol.write(
                         "Viral Shedding Function: {}\n".format(self.city.viral_shedding_profile["shedding_function"]))
@@ -263,7 +269,17 @@ class ParameterFitting:
                         if csv_viral_shedding_path is not None:
                             write_viral_shedding.write(
                                 "{}\n".format(self.city.viral_shedding_profile["param"][p]["param"][self.city.viral_shedding_profile["param_dim"] - 1]))
-                solution[var] = vsp_param.tolist()
+                    # debug
+                    print("debug")
+                    print(self.city.viral_shedding_profile["param"][p]["param"])
+                    for i in range(self.city.viral_shedding_profile["param_dim"] - 1):
+                        vsp_param_full.append(self.city.viral_shedding_profile["param"][p]["param"][i])
+                    vsp_param_full.append(self.city.viral_shedding_profile["param"][p]["param"][
+                                                      self.city.viral_shedding_profile["param_dim"] - 1])
+                    vsp_end_dates_full.append(self.city.viral_shedding_profile["param"][p]["end_date"].strftime("%m/%d/%Y"))
+                #solution[var] = vsp_param.tolist()
+                solution[var + "_param"] = vsp_param_full
+                solution[var + "_end_dates"] = vsp_end_dates_full
             else:
                 print(f"{var} = {x_variables[idx]}")
                 solution[var] = x_variables[idx]
@@ -334,7 +350,7 @@ class ParameterFitting:
             elif hasattr(self.city.base_epi, var):
                 setattr(self.city.base_epi, var, x_variables[idx])
                 rel_idx += 1 # Apr. 19, 2023, Sonny, for tracking the index of x variables
-            elif var == "transmission_reduction": # July, may be way to optimize the fitting spead, there is reconstruction
+            elif var == "transmission_reduction": # July, may be a way to optimize the fitting speed, there is reconstruction
                 # of transmission reduction rate
                 # Apr. 19, 2023, Sonny, rel_idx is for tracking the index of x variables
                 tr_reduc, cocoon_reduc = self.create_transmission_reduction(x_variables[rel_idx:])
