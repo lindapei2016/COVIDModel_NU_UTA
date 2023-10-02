@@ -358,9 +358,14 @@ print(rep.compute_cost())
 # beds. Depending on the case count threshold the other two indicators take different values. I define them as
 # "non_surge" and "surge" but we can change those later if we want to do more general systems.
 
+# Note that when using a CDCTierPolicy object, we use different tiers
+# "tiers_CDC.json" provides pre-vaccination transmission reduction tiers
+#   whereas "tiers_CDC_reduced_values.json" provides post-vaccination transmission reduction tiers
+tiers = TierInfo("austin", "tiers_CDC.json")
+
 case_threshold = 200
-hosp_adm_thresholds = {"non_surge": (-1, -1, 10, 20, 20), "surge": (-1, -1, -1, 10, 10)}
-staffed_thresholds = {"non_surge": (-1, -1, 0.1, 0.15, 0.15), "surge": (-1, -1, -1, 0.1, 0.1)}
+hosp_adm_thresholds = {"non_surge": (10, 20, 20), "surge": (-1, 10, 10)}
+staffed_thresholds = {"non_surge": (0.1, 0.15, 0.15), "surge": (-1, 0.1, 0.1)}
 
 # CDC threshold uses 7-day sum of hospital admission per 100k. The equivalent values if we were to use 7-day avg.
 # hospital admission instead are as follows. We use equivalent thresholds to plot and evaluate the results in our

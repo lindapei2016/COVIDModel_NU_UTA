@@ -1,16 +1,22 @@
 ###############################################################################
 
-# This script contains beginning-to-end sample path generation
-#   and evaluation of CDC policies. User can specify which CDC policies
-#   they would like to evaluate.
-# Can split up sample path generation and policy evaluation on
-#   parallel processors using ''mpi4py.''
-# The number of sample paths generated (and number of replications
-#   that each policy is evaluated on) is
-#       num_processors_evaluation x sample_paths_generated_per_processor
-#           (num_processors_evaluation) is inferred from mpi call
-#           (sample_paths_generated_per_processor is a variable that is
-#       specified in the code)
+# Based on Script_CDCOptimization_FinerGrid.py
+
+# Runs additional 300 replications on selected policies
+# Selected policies are the non-eliminated policies based on
+#   (partial) KN using # red days as performance measure
+#   and based on feasibility
+# Not doing last peak
+
+# Note the reps_offset is 300 because we do not want to
+#   re-simulate the 300 reps we already simulated
+#
+# Step 4 & 5 have been merged -- variable number of policies
+#   for each peak -- so need to distribute different policies
+#   and different numbers of policies across processors for each peak
+
+# Also shifted the bit generator seeds so there is not RNG overlap
+#   from the previous 300 replications
 
 ###############################################################################
 
@@ -69,18 +75,18 @@ need_sample_paths = False
 # Different than num_processors_evaluation because
 #   num_processors_sample_path is used for naming/distinguishing
 #   states .json files
-num_processors_sample_paths = 300
-sample_paths_generated_per_processor = 1
+num_processors_sample_paths = 80
+sample_paths_generated_per_processor = 100
 
 # Change to False if evaluation is already done
 need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 300
+num_reps_evaluated_per_policy = 1000
 
 # Reps offset
 # Rep number to start on
-reps_offset = 0
+reps_offset = 1000
 
 # If True, only test 2 policies
 using_test_set_only = False
@@ -277,7 +283,17 @@ if using_test_set_only:
     pre_vaccine_policies = pre_vaccine_policies[:2]
     post_vaccine_policies = post_vaccine_policies[:2]
 
-# breakpoint()
+subset_policies_ix = []
+
+# Get union of KN-surviving policies for peak 1, 2, and 3
+for peak in np.arange(3):
+    non_eliminated_feasible_policies = pd.read_csv("w330_first1000_non_eliminated_feasible_policies_peak" + str(peak) +
+                                                   ".csv", header=None)
+    subset_policies_ix.append(np.asarray(non_eliminated_feasible_policies))
+
+# And append CDC policy because we want to simulate it!
+subset_policies_ix = set(np.concatenate(subset_policies_ix).flatten())
+subset_policies_ix = np.asarray(list(subset_policies_ix) + [12172]).astype(int)
 
 ###############################################################################
 
@@ -288,7 +304,7 @@ reps_per_peak_dict = {}
 peaks_dates_strs = ["2020-05-31", "2020-11-30", "2021-07-14", "2021-11-30"]
 
 if need_evaluation:
-    for peak in np.arange(4):
+    for peak in np.arange(3):
         reps = []
         for p in np.arange(num_processors_sample_paths):
             for sample_path_number in np.arange(sample_paths_generated_per_processor):
@@ -315,7 +331,7 @@ if need_evaluation:
 # Step 4: split policies amongst processors and create RNG for each processor
 # Some processors have base_assignment
 # Others have base_assignment + 1
-num_policies = len(pre_vaccine_policies)
+num_policies = len(subset_policies_ix)
 base_assignment = int(np.floor(num_policies / num_processors_evaluation))
 leftover = num_policies % num_processors_evaluation
 
@@ -331,27 +347,34 @@ slicepoints = np.append([0],
 #   100 processors, then there will be seed overlap
 # Right now, use a different bit generator for every parallel processor
 
-bit_generator = np.random.MT19937(1000 + rank)
+bit_generator = np.random.MT19937(1500 + rank)
 
 ###############################################################################
 
 # Step 5: evaluate policies
+
+# policy_id is the actual policy id (index with respect to whole set of 12172 policies)
+# subset_policy_id is the index with respect to subset of 12172 policies selected for
+#   additional replications
+
 peaks_start_times = [93, 276, 502, 641]
 peaks_end_times = [215, 397, 625, 762]
-policy_ids_to_evaluate = np.arange(slicepoints[rank], slicepoints[rank + 1])
+subset_policy_ids_to_evaluate = np.arange(slicepoints[rank], slicepoints[rank + 1])
 
 if need_evaluation:
-    for peak in np.arange(4):
+    for peak in np.arange(3):
 
         reps = reps_per_peak_dict[peaks_dates_strs[peak]]
         end_time = peaks_end_times[peak]
 
-        for policy_id in policy_ids_to_evaluate:
+        for subset_policy_id in subset_policy_ids_to_evaluate:
 
             if peak == 0 or peak == 1:
-                policy = pre_vaccine_policies[policy_id]
+                policy = np.array(pre_vaccine_policies)[subset_policies_ix][subset_policy_id]
             else:
-                policy = post_vaccine_policies[policy_id]
+                policy = np.array(post_vaccine_policies)[subset_policies_ix][subset_policy_id]
+
+            policy_id = np.arange(12173)[subset_policies_ix][subset_policy_id]
 
             cost_per_rep = []
             feasibility_per_rep = []

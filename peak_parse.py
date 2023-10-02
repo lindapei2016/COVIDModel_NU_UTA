@@ -2,6 +2,9 @@
 
 # Misc parsing stuff :O
 
+# Misc routines run on local computer to combine/reorganize files
+#   created from different experiments
+
 ###############################################################################
 
 import copy
@@ -14,6 +17,59 @@ import numpy as np
 import glob
 
 base_path = Path(__file__).parent
+
+###############################################################################
+
+# Combining first 300 replications from all policies with next 700 replications
+#   from surviving policies
+
+folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_1000Reps"
+
+prefix1 = "first300_"
+prefix2 = "second700_"
+
+for peak in np.arange(3):
+
+    stage2_days_df_1 = pd.read_csv(
+        base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+        index_col=0)
+    stage3_days_df_1 = pd.read_csv(
+        base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+        index_col=0)
+    ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
+                                                (prefix1 + "aggregated_peak" + str(peak) +
+                                                 "_ICU_violation_patient_days.csv"),
+                                                index_col=0)
+
+    stage2_days_df_2 = pd.read_csv(
+        base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+        index_col=0)
+    stage3_days_df_2 = pd.read_csv(
+        base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+        index_col=0)
+    ICU_violation_patient_days_df_2 = pd.read_csv(base_path / folder_name /
+                                                (prefix2 + "aggregated_peak" + str(peak) +
+                                                 "_ICU_violation_patient_days.csv"),
+                                                index_col=0)
+
+    stage2_days_df = pd.concat([stage2_days_df_1[stage2_days_df_2.columns], stage2_days_df_2], axis=0)
+    stage3_days_df = pd.concat([stage3_days_df_1[stage3_days_df_2.columns], stage3_days_df_2])
+    ICU_violation_patient_days_df = pd.concat([ICU_violation_patient_days_df_1[ICU_violation_patient_days_df_2.columns],
+                                               ICU_violation_patient_days_df_2])
+
+    # print(stage2_days_df[:300].mean() - stage2_days_df[300:].mean())
+    # print(stage3_days_df[:300].mean() - stage3_days_df[300:].mean())
+    # print(ICU_violation_patient_days_df[:300].mean() - ICU_violation_patient_days_df[300:].mean())
+
+    stage2_days_df.reset_index(drop=True, inplace=True)
+    stage3_days_df.reset_index(drop=True, inplace=True)
+    ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
+
+    stage2_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_stage2_days.csv")
+    stage3_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_stage3_days.csv")
+    ICU_violation_patient_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+
+breakpoint()
 
 ###############################################################################
 
@@ -99,13 +155,13 @@ for peak in np.arange(2,4):
     new_ICU_violation_patient_days_df = pd.concat((ICU_violation_patient_days_df, CDC_implementation_ICU_violation_patient_days_df["12172"]), axis=1)
 
     new_stage2_days_df.to_csv(
-        "aggregated_with_CDCimplementation_peak" +
+        "aggregated_peak" +
         str(peak) + "_stage2_days.csv")
     new_stage3_days_df.to_csv(
-        "aggregated_with_CDCimplementation_peak" +
+        "aggregated_peak" +
         str(peak) + "_stage3_days.csv")
     new_ICU_violation_patient_days_df.to_csv(
-        "aggregated_with_CDCimplementation_peak" +
+        "aggregated_peak" +
         str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()

@@ -26,6 +26,11 @@
 #   performance measures of days in stage 2, days in stage 3,
 #   and ICU violation patient days across 4 peaks
 #
+# WARNING: some stuff is hardcoded unfortunately --
+#   such as the number of peaks and number of reps --
+#   make sure that these are set properly -- right now
+#   we do peaks 0,1,2 and 300 reps per peak
+#
 # Note on "all peaks" vs "across peaks" -- tried to create a distinction
 #   but hopefully this does not add additional confusion --
 #   "all peaks" refers to dataframes that have 1200 rows -- 300 reps x 4 peaks
@@ -46,7 +51,9 @@
 
 ###############################################################################
 
-# Imports
+#######################################
+############## IMPORTS ################
+#######################################
 
 import pandas as pd
 import numpy as np
@@ -70,7 +77,7 @@ base_path = Path(__file__).parent
 ###################################################
 
 # Change this to the name of a folder with aggregated files to parse
-aggregated_files_folder_name = "Results_08292023_NoCaseThreshold_12172Policies_SingleAndDoubleIndicators_300Reps"
+aggregated_files_folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_1000Reps"
 
 # Change this to prefix of the aggregated files to parse
 # Files to parse are
@@ -88,7 +95,7 @@ aggregated_files_folder_name = "Results_08292023_NoCaseThreshold_12172Policies_S
 #   and is recreated here as well -- make sure to preserve the
 #   mapping order so that IDs are matched appropriately to
 #   the actual policy
-aggregated_files_prefix = "aggregated_with_CDCimplementation_peak"
+aggregated_files_prefix = "all1000_aggregated_peak"
 
 # Toggle for whether or not to create reorganized dfs
 #   -- these dfs contain columns for thresholds values
@@ -97,7 +104,13 @@ aggregated_files_prefix = "aggregated_with_CDCimplementation_peak"
 # If full_df_peak0.csv, full_df_peak1.csv, full_df_peak2.csv,
 #   full_df_peak3.csv, full_df_across_peaks.csv already exist,
 #   can set this to False
-create_reorganized_dfs = False
+create_reorganized_dfs = True
+
+# Set to True if have dataframe for subset of 12172 policies
+subset_of_policies = True
+
+# Toggle whether or not to run KN
+run_KN = True
 
 ###############################################################################
 
@@ -251,10 +264,10 @@ hosp_adm_thresholds = {"non_surge": (-1,
 
 staffed_thresholds = {"non_surge": (-1,
                                     0.1,
-                                    0.2),
+                                    0.15),
                       "surge": (-1,
                                 -1,
-                                0.1)}
+                                0.15)}
 
 policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
@@ -296,7 +309,7 @@ ICU_violation_patient_days_per_peak = []
 stage2_days_dfs_per_peak = []
 stage3_days_dfs_per_peak = []
 
-for peak in np.arange(4):
+for peak in np.arange(3):
     stage2_days_df = pd.read_csv(
         base_path / aggregated_files_folder_name /
         (aggregated_files_prefix + str(peak) + "_stage2_days.csv"),
@@ -326,10 +339,12 @@ stage2_days_all_peaks = pd.concat(stage2_days_dfs_per_peak)
 stage3_days_all_peaks = pd.concat(stage3_days_dfs_per_peak)
 ICU_violation_patient_days_all_peaks = pd.concat(ICU_violation_patient_days_per_peak)
 
-feasibility_across_peaks = ((ICU_violation_patient_days_all_peaks == 0)[:300] &
-                            (ICU_violation_patient_days_all_peaks == 0)[300:600] &
-                            (ICU_violation_patient_days_all_peaks == 0)[600:900] &
-                            (ICU_violation_patient_days_all_peaks == 0)[900:1200])
+# If doing 4 peaks, need to add 4th peak
+# Oh -- I hardcoded number of reps -- so need to change the index cutoffs depending on
+#   how many replications!
+feasibility_across_peaks = ((ICU_violation_patient_days_all_peaks == 0)[:1000] &
+                            (ICU_violation_patient_days_all_peaks == 0)[1000:2000] &
+                            (ICU_violation_patient_days_all_peaks == 0)[2000:])
 
 feasibility_across_peaks_mean = feasibility_across_peaks.mean()
 
@@ -340,16 +355,14 @@ feasibility_across_peaks_mean = feasibility_across_peaks.mean()
 # Test different values of w -- choose w so that the unconstrained
 #   lowest_cost roughly has 95% feasibility
 
-# Even if not searching for an lowest_cost penalty, need to
+# Even if not searching for a lowest_cost penalty, need to
 #   run the following to generate cost_df_all_peaks
 #   (with lowest_cost penalty) for further analysis
 
-# For this dataset, 543 is the properly calibrated penalty for
-#   ~across-peaks~
-for w in [543]:
+for w in [330]:
     cost_dfs_per_peak = []
 
-    for peak in np.arange(4):
+    for peak in np.arange(3):
         cost_df = make_weighted_sum(stage1_days_dict[str(peak)],
                                     stage2_days_dict[str(peak)],
                                     stage3_days_dict[str(peak)],
@@ -388,6 +401,13 @@ for i in range(len(policies)):
     non_surge_hosp_adm_second_thresholds.append(policies[i][1]["non_surge"][2])
     non_surge_staffed_second_thresholds.append(policies[i][2]["non_surge"][2])
 
+if subset_of_policies:
+    subset_policies_ix = np.sort(np.array(cost_df_all_peaks.columns.astype("int")))
+    non_surge_hosp_adm_first_thresholds = np.array(non_surge_hosp_adm_first_thresholds)[subset_policies_ix]
+    non_surge_staffed_first_thresholds = np.array(non_surge_staffed_first_thresholds)[subset_policies_ix]
+    non_surge_hosp_adm_second_thresholds = np.array(non_surge_hosp_adm_second_thresholds)[subset_policies_ix]
+    non_surge_staffed_second_thresholds = np.array(non_surge_staffed_second_thresholds)[subset_policies_ix]
+
 
 # There's some wonky business with the column names
 # This is not a problem for the single-indicator ordering because that is from 0 to 2652
@@ -401,6 +421,8 @@ for i in range(len(policies)):
 # Need to adjust feasibility for across-peak stuff
 
 def create_full_df(cost_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df, feasibility_df, filename):
+
+    # breakpoint()
     cost_df.columns = cost_df.columns.astype("int")
     cost_array_index_corrected = np.array(cost_df[cost_df.columns.sort_values()].mean())
     cost_array_index_corrected_standarderror = np.array(cost_df[cost_df.columns.sort_values()].sem())
@@ -422,6 +444,8 @@ def create_full_df(cost_df, stage2_days_df, stage3_days_df, ICU_violation_patien
     feasibility_df.columns = feasibility_df.columns.astype("int")
     feasibility_df_index_corrected = np.array(feasibility_df[feasibility_df.columns.sort_values()].mean())
     feasibility_df_index_corrected_standard_error = np.array(feasibility_df[feasibility_df.columns.sort_values()].sem())
+
+    # breakpoint()
 
     full_df = pd.DataFrame({"hosp1": non_surge_hosp_adm_first_thresholds,
                             "hosp2": non_surge_hosp_adm_second_thresholds,
@@ -458,7 +482,7 @@ def create_full_df(cost_df, stage2_days_df, stage3_days_df, ICU_violation_patien
 full_df_dict = {}
 
 if create_reorganized_dfs:
-    for peak in np.arange(4):
+    for peak in np.arange(3):
         feasibility_df = (ICU_violation_patient_days_dict[str(peak)] < 1e-3)
 
         full_df_dict[str(peak)] = create_full_df(cost_dfs_per_peak[peak],
@@ -475,11 +499,15 @@ if create_reorganized_dfs:
                                           feasibility_across_peaks,
                                           "full_df_across_peaks.csv")
 else:
-    for peak in np.arange(4):
+    for peak in np.arange(3):
         full_df_dict[str(peak)] = pd.read_csv(base_path / aggregated_files_folder_name /
                                               ("full_df_peak" + str(peak) + ".csv"), index_col=0)
     full_df_across_peaks = pd.read_csv(base_path / aggregated_files_folder_name / "full_df_across_peaks.csv",
                                        index_col=0)
+
+###############################################################################
+
+# Additional analysis (currently unorganized)
 
 ###############################################################################
 
@@ -489,6 +517,8 @@ breakpoint()
 # Then get additional simulation output for these systems
 # Maybe run bi-PASS with unconstrained objective function?
 #   ^ But maybe not if the number of systems is small
+
+# Using original k and sample variance based off of 300 replications
 
 c = 1
 alpha = 0.05/2
@@ -505,7 +535,11 @@ hsquared = 2 * c * eta * (n0 - 1)
 # 1 day in red? or 1 patient day violation? think about...
 # iz_param = 540
 
-iz_param = 1
+iz_param = 330
+
+# Use the same k and same variances based on 300 reps for subsequent iterations of KN
+#   to get desired statistical guarantee
+num_feasible_policies_300_reps = [703, 2708, 357]
 
 # Also, idea is to do the pairwise comparisons more intelligently for KN
 # Compare policies to best sample mean policy and then eliminate policies
@@ -514,49 +548,66 @@ iz_param = 1
 # Right now doing KN where top 100 policies are compared to other policies
 #   rather than do O(10k^2) comparisons
 
-for peak in np.arange(4):
+# full_df_across_peaks[full_df_across_peaks["feasibility"] > 0.95].sort_values("cost")
 
-    eliminated_policies_ix = []
+# This is correct -- just confusing because we use both full_df and
+#   cost_dfs_per_peak -- and their formatting is different -- and former uses
+#   integers for indexing and latter has columns that are strings
+# ^ TODO: want to re-write / comment more clearly
 
-    # Change to 12712 (total num policies) to do full KN
-    for i in range(100):
+# for peak in np.arange(4):
+if run_KN:
+    for peak in np.arange(3):
 
-        eliminated_policies_ix = set(eliminated_policies_ix)
-        eliminated_policies_ix = list(eliminated_policies_ix)
+        if subset_of_policies:
+            # Reset index so index matches the actual policy ID (wrt original 12172+1 policies)
+            full_df_dict[str(peak)].index = subset_policies_ix
 
-        min_cost_ix_peak = full_df_dict[str(peak)].sort_values("cost").index[i]
+        feasible_policies_df_current_peak = full_df_dict[str(peak)][full_df_dict[str(peak)]["feasibility"] > 0.95]
 
-        min_cost_stage3_days_peak = stage3_days_dict[str(peak)][str(min_cost_ix_peak)]
+        k = len(feasible_policies_df_current_peak)
 
-        var_of_diff_dict = {}
+        eliminated_policies_ix = set([])
 
-        for col in stage3_days_dict[str(peak)].columns:
-            var_of_diff = np.sum((stage3_days_dict[str(peak)][col] -
-                                  min_cost_stage3_days_peak -
-                                  (stage3_days_dict[str(peak)][col].mean() -
-                                   min_cost_stage3_days_peak.mean()))**2)/(n0-1)
-            var_of_diff_dict[col] = var_of_diff
+        for i in range(k-1):
 
-        comparison_mean = min_cost_stage3_days_peak.mean()
+            eliminated_policies_ix = set(eliminated_policies_ix)
+            eliminated_policies_ix = list(eliminated_policies_ix)
 
-        for col in stage3_days_dict[str(peak)].columns:
-            if col == str(min_cost_ix_peak):
-                continue
-            elif col in eliminated_policies_ix:
-                continue
-            else:
-                wiggle_room = max(0, (iz_param / (2*c*r)) * (hsquared * var_of_diff_dict[col] / iz_param**2 - r))
-                if stage3_days_dict[str(peak)][col].mean() < comparison_mean - wiggle_room:
-                    eliminated_policies_ix.append(col)
+            # Policy we are using as "reference" (or "basis" for pairwise comparisons),
+            #   based on cost -- we want to use smaller cost policies to knock out other policies
+            reference_ix_smaller_cost_peak = feasible_policies_df_current_peak.sort_values("cost").index[i]
+            comparison_mean = feasible_policies_df_current_peak.sort_values("cost").iloc[i]["cost"]
 
-    # print(len(eliminated_policies_ix))
+            # breakpoint()
 
-    non_eliminated_policies = set(stage3_days_dict[str(peak)].columns).difference(set(eliminated_policies_ix))
-    feasible_policies = set(full_df_dict[str(peak)][full_df_dict[str(peak)].feasibility > 0.95].index.astype(str))
-    non_eliminated_feasible_policies = list(non_eliminated_policies.intersection(feasible_policies))
+            var_of_diff_dict = {}
 
-    np.savetxt("non_eliminated_feasible_policies_peak" + str(peak) + ".csv",
-               np.array(non_eliminated_feasible_policies).astype(int))
+            for ix in feasible_policies_df_current_peak.index:
+                var_of_diff = np.sum((cost_dfs_per_peak[peak][ix][:300] - cost_dfs_per_peak[peak][reference_ix_smaller_cost_peak][:300] -
+                                      (feasible_policies_df_current_peak["cost"].loc[ix] - comparison_mean))**2)/(n0-1)
+                var_of_diff_dict[ix] = var_of_diff
+
+            # counter = 0
+
+            for ix in feasible_policies_df_current_peak.index:
+                # counter += 1
+                # print(counter)
+                if ix == reference_ix_smaller_cost_peak:
+                    continue
+                elif ix in eliminated_policies_ix:
+                    continue
+                else:
+                    wiggle_room = max(0, (iz_param / (2*c*r)) * (hsquared * var_of_diff_dict[ix] / iz_param**2 - r))
+                    if feasible_policies_df_current_peak["cost"].loc[ix] > comparison_mean + wiggle_room:
+                        eliminated_policies_ix.append(ix)
+
+        non_eliminated_policies = set(stage3_days_dict[str(peak)].columns).difference(set(eliminated_policies_ix))
+        feasible_policies = set(feasible_policies_df_current_peak.index)
+        non_eliminated_feasible_policies = list(non_eliminated_policies.intersection(feasible_policies))
+
+        np.savetxt("non_eliminated_feasible_policies_peak" + str(peak) + ".csv",
+                   np.array(non_eliminated_feasible_policies).astype("int"))
 
 
 ###############################################################################
