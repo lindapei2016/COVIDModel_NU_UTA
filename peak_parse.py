@@ -23,10 +23,10 @@ base_path = Path(__file__).parent
 # Combining first 300 replications from all policies with next 700 replications
 #   from surviving policies
 
-folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_1000Reps"
+folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_3000Reps"
 
-prefix1 = "first300_"
-prefix2 = "second700_"
+prefix1 = "all3000_"
+prefix2 = "4_1000_"
 
 for peak in np.arange(3):
 
@@ -65,9 +65,9 @@ for peak in np.arange(3):
     stage3_days_df.reset_index(drop=True, inplace=True)
     ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
 
-    stage2_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_stage2_days.csv")
-    stage3_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_stage3_days.csv")
-    ICU_violation_patient_days_df.to_csv("all1000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+    stage2_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_stage2_days.csv")
+    stage3_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_stage3_days.csv")
+    ICU_violation_patient_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()
 

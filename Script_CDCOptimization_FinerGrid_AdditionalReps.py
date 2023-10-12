@@ -86,7 +86,7 @@ num_reps_evaluated_per_policy = 1000
 
 # Reps offset
 # Rep number to start on
-reps_offset = 1000
+reps_offset = 4000
 
 # If True, only test 2 policies
 using_test_set_only = False
@@ -287,7 +287,7 @@ subset_policies_ix = []
 
 # Get union of KN-surviving policies for peak 1, 2, and 3
 for peak in np.arange(3):
-    non_eliminated_feasible_policies = pd.read_csv("w330_first1000_non_eliminated_feasible_policies_peak" + str(peak) +
+    non_eliminated_feasible_policies = pd.read_csv("w330_4000_non_eliminated_feasible_policies_peak" + str(peak) +
                                                    ".csv", header=None)
     subset_policies_ix.append(np.asarray(non_eliminated_feasible_policies))
 
@@ -303,28 +303,34 @@ subset_policies_ix = np.asarray(list(subset_policies_ix) + [12172]).astype(int)
 reps_per_peak_dict = {}
 peaks_dates_strs = ["2020-05-31", "2020-11-30", "2021-07-14", "2021-11-30"]
 
+rep_counter = 0
+
 if need_evaluation:
     for peak in np.arange(3):
         reps = []
         for p in np.arange(num_processors_sample_paths):
             for sample_path_number in np.arange(sample_paths_generated_per_processor):
-                prefix = str(p) + "_" + str(sample_path_number) + "_" + peaks_dates_strs[peak] + "_"
+                rep_counter += 1
+                if rep_counter < reps_offset:
+                    continue
+                else:
+                    prefix = str(p) + "_" + str(sample_path_number) + "_" + peaks_dates_strs[peak] + "_"
 
-                # Create a rep with no policy attached
-                # Will edit the random number generator later, so seed does not matter
-                rep = SimReplication(austin, vaccines, None, 1000)
-                Tools_InputOutput.import_rep_from_json(rep,
-                                                       base_path / "states" / (prefix + "sim.json"),
-                                                       base_path / "states" / (prefix + "v0.json"),
-                                                       base_path / "states" / (prefix + "v1.json"),
-                                                       base_path / "states" / (prefix + "v2.json"),
-                                                       base_path / "states" / (prefix + "v3.json"),
-                                                       None,
-                                                       base_path / "states" / (prefix + "epi_params.json"))
-                reps.append(rep)
-            if len(reps) >= num_reps_evaluated_per_policy + reps_offset:
+                    # Create a rep with no policy attached
+                    # Will edit the random number generator later, so seed does not matter
+                    rep = SimReplication(austin, vaccines, None, 1000)
+                    Tools_InputOutput.import_rep_from_json(rep,
+                                                           base_path / "states" / (prefix + "sim.json"),
+                                                           base_path / "states" / (prefix + "v0.json"),
+                                                           base_path / "states" / (prefix + "v1.json"),
+                                                           base_path / "states" / (prefix + "v2.json"),
+                                                           base_path / "states" / (prefix + "v3.json"),
+                                                           None,
+                                                           base_path / "states" / (prefix + "epi_params.json"))
+                    reps.append(rep)
+            if len(reps) >= num_reps_evaluated_per_policy:
                 break
-        reps_per_peak_dict[peaks_dates_strs[peak]] = reps[reps_offset:]
+        reps_per_peak_dict[peaks_dates_strs[peak]] = reps[:num_reps_evaluated_per_policy]
 
 ###############################################################################
 
@@ -347,7 +353,7 @@ slicepoints = np.append([0],
 #   100 processors, then there will be seed overlap
 # Right now, use a different bit generator for every parallel processor
 
-bit_generator = np.random.MT19937(1500 + rank)
+bit_generator = np.random.MT19937(4000 + rank)
 
 ###############################################################################
 
