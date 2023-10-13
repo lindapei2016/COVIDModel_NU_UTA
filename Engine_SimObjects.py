@@ -58,6 +58,7 @@ class CDCTierPolicy:
                  case_threshold,
                  hosp_adm_thresholds,
                  staffed_bed_thresholds,
+                 specified_total_hosp_beds=None,
                  percentage_cases=0.4):
         """
         :param instance:
@@ -74,6 +75,9 @@ class CDCTierPolicy:
                     surge : thresholds level when case counts is above the case threshold
                    }
         :param staffed_bed_thresholds: (dict of dict) similar entries as the hosp_adm_thresholds.
+        :param specified_total_hosp_beds [None] or [int]: if None, will use total_hosp_beds
+            from instance (from setup json file) as total hospital capacity. Otherwise,
+            will use specified integer instead.
         :param percentage_cases: the CDC system uses total case counts as an indicators. However, we don't have a direct
         interpretation of case counts in the model. We estimate the real total case count as some percentage of people
         entering symptomatic compartment (ToIY). We use percentage_case to adjust ToIY.
@@ -83,6 +87,7 @@ class CDCTierPolicy:
         self.case_threshold = case_threshold
         self.hosp_adm_thresholds = hosp_adm_thresholds
         self.staffed_bed_thresholds = staffed_bed_thresholds
+        self.specified_total_hosp_beds = specified_total_hosp_beds
         self.percentage_cases = percentage_cases
         self.tier_history = None
         self.surge_history = None
@@ -123,7 +128,10 @@ class CDCTierPolicy:
 
         # Compute 7-day average percent of COVID beds:
         IH_total = IH.sum((1, 2)) + ICU.sum((1, 2))
-        IH_avg = IH_total[moving_avg_start:].mean() / self._instance.hosp_beds
+        if self.specified_total_hosp_beds is None:
+            IH_avg = IH_total[moving_avg_start:].mean() / self._instance.total_hosp_beds
+        else:
+            IH_avg = IH_total[moving_avg_start:].mean() / self.specified_total_hosp_beds
 
         current_tier = self.tier_history[t - 1]
 

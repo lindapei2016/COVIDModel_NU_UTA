@@ -34,10 +34,12 @@ class HistoricalStages:
                  ICU_history,
                  ToIY_history,
                  policy,
+                 specified_total_hosp_beds=None,
                  percentage_cases=1):
 
         self.instance = instance
         self.policy = policy
+        self.specified_total_hosp_beds = specified_total_hosp_beds
         self.percentage_cases = percentage_cases
         self.ToIHT_history = np.array(ToIHT_history)
         self.IH_history = np.array(IH_history)
@@ -80,7 +82,10 @@ class HistoricalStages:
         # Compute 7-day average percent of COVID beds:
         IH_total = self.IH_history + self.ICU_history
         if t > 0:
-            IH_avg = IH_total[moving_avg_start:t].mean() / self.instance.hosp_beds
+            if self.specified_total_hosp_beds is None:
+                IH_avg = IH_total[moving_avg_start:t].mean() / self.instance.total_hosp_beds
+            else:
+                IH_avg = IH_total[moving_avg_start:t].mean() / self.total_hosp_beds
         else:
             IH_avg = 0
         # Decide on the active hospital admission and staffed bed thresholds depending on the estimated

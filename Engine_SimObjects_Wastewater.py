@@ -58,6 +58,7 @@ class CDCTierPolicy:
                  case_threshold,
                  hosp_adm_thresholds,
                  staffed_bed_thresholds,
+                 specified_total_hosp_beds=None,
                  percentage_cases=0.4):
         """
         :param instance:
@@ -74,6 +75,9 @@ class CDCTierPolicy:
                     surge : thresholds level when case counts is above the case threshold
                    }
         :param staffed_bed_thresholds: (dict of dict) similar entries as the hosp_adm_thresholds.
+        :param specified_total_hosp_beds [None] or [int]: if None, will use total_hosp_beds
+            from instance (from setup json file) as total hospital capacity. Otherwise,
+            will use specified integer instead.
         :param percentage_cases: the CDC system uses total case counts as an indicators. However, we don't have a direct
         interpretation of case counts in the model. We estimate the real total case count as some percentage of people
         entering symptomatic compartment (ToIY). We use percentage_case to adjust ToIY.
@@ -83,16 +87,19 @@ class CDCTierPolicy:
         self.case_threshold = case_threshold
         self.hosp_adm_thresholds = hosp_adm_thresholds
         self.staffed_bed_thresholds = staffed_bed_thresholds
+        self.specified_total_hosp_beds = specified_total_hosp_beds
         self.percentage_cases = percentage_cases
         self.tier_history = None
         self.surge_history = None
+        self.active_indicator_history = []
 
     def reset(self):
         self.tier_history = None
         self.surge_history = None
+        self.active_indicator_history = []
 
     def __repr__(self):
-        return f"CDC_{self.case_threshold}"
+        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds['non_surge'][0]}_{self.staffed_bed_thresholds['non_surge'][0]}_{self.percentage_cases}"
 
     def __call__(self, t, ToIHT, IH, ToIY, ICU):
         N = self._instance.N
@@ -100,6 +107,7 @@ class CDCTierPolicy:
         if self.tier_history is None:
             self.tier_history = [None for i in range(t)]
             self.surge_history = [None for i in range(t)]
+            self.active_indicator_history = [None for i in range(t)]
         if len(self.tier_history) > t:
             return
 
@@ -109,7 +117,7 @@ class CDCTierPolicy:
         ICU = np.array(ICU)
 
         # Compute daily admissions moving sum
-        moving_avg_start = np.maximum(0, t - self._instance.config["moving_avg_len"])
+        moving_avg_start = np.maximum(0, t - self._instance.moving_avg_len)
         hos_adm_total = ToIHT.sum((1, 2))
         hosp_adm_sum = 100000 * hos_adm_total[moving_avg_start:].sum() / N.sum((0, 1))
 
@@ -120,7 +128,10 @@ class CDCTierPolicy:
 
         # Compute 7-day average percent of COVID beds:
         IH_total = IH.sum((1, 2)) + ICU.sum((1, 2))
-        IH_avg = IH_total[moving_avg_start:].mean() / self._instance.hosp_beds
+        if self.specified_total_hosp_beds is None:
+            IH_avg = IH_total[moving_avg_start:].mean() / self._instance.total_hosp_beds
+        else:
+            IH_avg = IH_total[moving_avg_start:].mean() / self.specified_total_hosp_beds
 
         current_tier = self.tier_history[t - 1]
 
@@ -143,6 +154,13 @@ class CDCTierPolicy:
 
         # choose the stricter tier among tiers the two indicators suggesting:
         new_tier = max(hosp_adm_tier, staffed_bed_tier)
+        # keep track of the active indicator for indicator statistics:
+        if hosp_adm_tier > staffed_bed_tier:
+            active_indicator = 0
+        elif hosp_adm_tier < staffed_bed_tier:
+            active_indicator = 1
+        else:
+            active_indicator = 2
 
         if current_tier != new_tier:  # bump to the next tier
             t_end = t + self.tiers[new_tier]["min_enforcing_time"]
@@ -152,6 +170,7 @@ class CDCTierPolicy:
 
         self.tier_history += [new_tier for i in range(t_end - t)]
         self.surge_history += [surge_state for i in range(t_end - t)]
+        self.active_indicator_history += [active_indicator for i in range(t_end - t)]
 
 
 class MultiTierPolicy:

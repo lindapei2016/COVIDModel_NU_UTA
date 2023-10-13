@@ -6,8 +6,13 @@ in the new directory.
 ## setup_data_Final.json
 This file has information about population size, epidemiological parameters etc. for a city instance. 
 - "start_date" and "end_date": start and end date of the simulation
-- "hosp_beds": hospital bed capacity.
-- "icu": ICU bed capacity.
+- "total_hosp_beds": total hospital beds (staffed inpatient beds) -- 
+number comes from averaging across the data gathering period of 
+https://covid-texas.csullender.com/?tsa=O, with outliers greater than 5000 removed, 
+multiplied by 0.946 to scale properly for Austin (some non-Austin counties included in original number)
+and rounded down.
+- "dedicated_covid_hosp_beds": dedicated covid hospital beds (rough estimate from officials)
+- "dedicated_covid_icu": dedicated covid icu beds -- a subset of dedicated_covid_hosp_beds (rough estimate from officials)
 - "epi_params":To learn more about epi_params please check Haoxiang et al.
 - "school_closure": school closure calendar of Austin. The model distinguishes if the schools are open or closed. 
 Don't forget to add the school closure schedule if you run the simulation for later dates.

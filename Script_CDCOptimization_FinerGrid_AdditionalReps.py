@@ -86,7 +86,11 @@ num_reps_evaluated_per_policy = 1000
 
 # Reps offset
 # Rep number to start on
-reps_offset = 4000
+reps_offset = 0
+
+# Set to True if have .csv files that specify
+#   which policies to simulate
+subset_of_policies = False
 
 # If True, only test 2 policies
 using_test_set_only = False
@@ -209,47 +213,47 @@ for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
     pre_vaccine_policies.append(pre_vaccine_policy)
     post_vaccine_policies.append(post_vaccine_policy)
 
-# 2-indicator policies
-
-non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                              (-1, 0, 1),
-                                                                              (0, 10, 1),
-                                                                              (17, 51, 1))
-non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
-                                                                             (-1, 0, 1),
-                                                                             (0, .2, 0.05),
-                                                                             (0.25, 0.55, 0.05))
-
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-
-    for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-
-        staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                            non_surge_staffed_thresholds[3],
-                                            non_surge_staffed_thresholds[4]),
-                              "surge": (-1,
-                                        -1,
-                                        non_surge_staffed_thresholds[3])}
-
-        pre_vaccine_policy = CDCTierPolicy(austin,
-                                           pre_vaccine_tiers,
-                                           case_threshold,
-                                           hosp_adm_thresholds,
-                                           staffed_thresholds)
-        post_vaccine_policy = CDCTierPolicy(austin,
-                                            post_vaccine_tiers,
-                                            case_threshold,
-                                            hosp_adm_thresholds,
-                                            staffed_thresholds)
-        pre_vaccine_policies.append(pre_vaccine_policy)
-        post_vaccine_policies.append(post_vaccine_policy)
+# # 2-indicator policies
+#
+# non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+#                                                                               (-1, 0, 1),
+#                                                                               (0, 10, 1),
+#                                                                               (17, 51, 1))
+# non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
+#                                                                              (-1, 0, 1),
+#                                                                              (0, .2, 0.05),
+#                                                                              (0.25, 0.55, 0.05))
+#
+# for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+#
+#     hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+#                                          non_surge_hosp_adm_thresholds[3],
+#                                          non_surge_hosp_adm_thresholds[4]),
+#                            "surge": (-1,
+#                                      -1,
+#                                      non_surge_hosp_adm_thresholds[3])}
+#
+#     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+#
+#         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+#                                             non_surge_staffed_thresholds[3],
+#                                             non_surge_staffed_thresholds[4]),
+#                               "surge": (-1,
+#                                         -1,
+#                                         non_surge_staffed_thresholds[3])}
+#
+#         pre_vaccine_policy = CDCTierPolicy(austin,
+#                                            pre_vaccine_tiers,
+#                                            case_threshold,
+#                                            hosp_adm_thresholds,
+#                                            staffed_thresholds)
+#         post_vaccine_policy = CDCTierPolicy(austin,
+#                                             post_vaccine_tiers,
+#                                             case_threshold,
+#                                             hosp_adm_thresholds,
+#                                             staffed_thresholds)
+#         pre_vaccine_policies.append(pre_vaccine_policy)
+#         post_vaccine_policies.append(post_vaccine_policy)
 
 # Also adding CDC policy
 hosp_adm_thresholds = {"non_surge": (-1,
@@ -283,17 +287,20 @@ if using_test_set_only:
     pre_vaccine_policies = pre_vaccine_policies[:2]
     post_vaccine_policies = post_vaccine_policies[:2]
 
-subset_policies_ix = []
+if subset_of_policies:
+    subset_policies_ix = []
 
-# Get union of KN-surviving policies for peak 1, 2, and 3
-for peak in np.arange(3):
-    non_eliminated_feasible_policies = pd.read_csv("w330_4000_non_eliminated_feasible_policies_peak" + str(peak) +
-                                                   ".csv", header=None)
-    subset_policies_ix.append(np.asarray(non_eliminated_feasible_policies))
+    # Get union of KN-surviving policies for peak 1, 2, and 3
+    for peak in np.arange(3):
+        non_eliminated_feasible_policies = pd.read_csv("w330_4000_non_eliminated_feasible_policies_peak" + str(peak) +
+                                                       ".csv", header=None)
+        subset_policies_ix.append(np.asarray(non_eliminated_feasible_policies))
 
-# And append CDC policy because we want to simulate it!
-subset_policies_ix = set(np.concatenate(subset_policies_ix).flatten())
-subset_policies_ix = np.asarray(list(subset_policies_ix) + [12172]).astype(int)
+    # And append CDC policy because we want to simulate it!
+    subset_policies_ix = set(np.concatenate(subset_policies_ix).flatten())
+    subset_policies_ix = np.asarray(list(subset_policies_ix) + [12172]).astype(int)
+else:
+    subset_policies_ix = [i for i in range(len(pre_vaccine_policies))]
 
 ###############################################################################
 
@@ -367,6 +374,8 @@ peaks_start_times = [93, 276, 502, 641]
 peaks_end_times = [215, 397, 625, 762]
 subset_policy_ids_to_evaluate = np.arange(slicepoints[rank], slicepoints[rank + 1])
 
+peaks_total_hosp_beds = [3026, 3791, 3841, 3537]
+
 if need_evaluation:
     for peak in np.arange(3):
 
@@ -379,6 +388,9 @@ if need_evaluation:
                 policy = np.array(pre_vaccine_policies)[subset_policies_ix][subset_policy_id]
             else:
                 policy = np.array(post_vaccine_policies)[subset_policies_ix][subset_policy_id]
+
+            # Important -- change the total hospital capacity to be the per-peak capacity
+            policy.specified_total_hosp_beds = peaks_total_hosp_beds[peak]
 
             policy_id = np.arange(12173)[subset_policies_ix][subset_policy_id]
 
@@ -408,7 +420,7 @@ if need_evaluation:
                 new_rep.rng = np.random.Generator(bit_generator)
 
                 cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days, surge_days \
-                    = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time)
+                    = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time + 1)
                 stage2_days_per_rep.append(stage2_days)
                 stage3_days_per_rep.append(stage3_days)
                 ICU_violation_patient_days_per_rep.append(ICU_violation_patient_days)

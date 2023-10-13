@@ -134,7 +134,7 @@ class Plot:
         :return:
         """
         if self.var == 'IH_history_average':
-            percent = self.instance.hosp_beds
+            percent = self.instance.total_hosp_beds
         else:
             percent = 1
         if 'Seven-day Average' in self.compartment_names[self.var]:
@@ -331,7 +331,7 @@ class Plot:
     def save_plot(self, plot_type):
         """ Save the plot in a png format to /plots directory. """
         plt.savefig(
-            self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.instance.hosp_beds}_{self.var}_{plot_type}.png",
+            self.path_to_plot / f"{self.real_history_end_date.date()}_{self.policy_name}_{self.instance.total_hosp_beds}_{self.var}_{plot_type}.png",
             bbox_inches='tight'
         )
 
@@ -675,7 +675,7 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
             plot = Plot(instance, real_history_end_date, real_data, val, f"{key}", policy_name, central_path_id,
                         color=('k', 'silver'))
 
-            plot.vertical_plot(policy_outputs["tier_history"], tier_colors, instance.hosp_beds)
+            plot.vertical_plot(policy_outputs["tier_history"], tier_colors, instance.total_hosp_beds)
         elif key == "ToIY_history" and "surge_history" in policy_outputs.keys():
             # ToDo: Fix the data reading part here:
             filename = 'austin_real_case.csv'

@@ -340,6 +340,8 @@ peaks_start_times = [93, 276, 502, 641]
 peaks_end_times = [215, 397, 625, 762]
 policy_ids_to_evaluate = np.arange(slicepoints[rank], slicepoints[rank + 1])
 
+peaks_total_hosp_beds = [3026, 3791, 3841, 3537]
+
 if need_evaluation:
     for peak in np.arange(4):
 
@@ -379,7 +381,7 @@ if need_evaluation:
                 new_rep.rng = np.random.Generator(bit_generator)
 
                 cost, feasibility, stage1_days, stage2_days, stage3_days, ICU_violation_patient_days, surge_days \
-                    = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time)
+                    = Tools_Optimization.evaluate_one_policy_one_sample_path(policy, new_rep, end_time + 1)
                 stage2_days_per_rep.append(stage2_days)
                 stage3_days_per_rep.append(stage3_days)
                 ICU_violation_patient_days_per_rep.append(ICU_violation_patient_days)
@@ -387,7 +389,7 @@ if need_evaluation:
                 policy.reset()
 
                 # Every 10 replications, save output
-                if rep_counter == 10 or rep_counter % 50 == 0 or rep_counter == num_reps_evaluated_per_policy:
+                if rep_counter == 1 or rep_counter % 100 == 0 or rep_counter == num_reps_evaluated_per_policy:
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_stage2_days.csv",
                                np.array(stage2_days_per_rep), delimiter=",")
                     np.savetxt("peak" + str(peak) + "_policy" + str(policy_id) + "_stage3_days.csv",

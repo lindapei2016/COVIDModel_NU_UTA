@@ -49,7 +49,7 @@ class Report:
         self.T_start = instance.cal.calendar.index(self.stats_start_date)
         self.T_end = instance.cal.calendar.index(stats_end_date)
         self.report_data = {}
-        self.cap_list = {'IHT': [self.instance.hosp_beds], "ICU": [350, 300, 250, 200, 150]}
+        self.cap_list = {'IHT': [self.instance.total_hosp_beds], "ICU": [350, 300, 250, 200, 150]}
 
     def build_report(self):
         """

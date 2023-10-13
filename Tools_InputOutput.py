@@ -388,7 +388,7 @@ def import_stoch_reps_for_reporting(seeds: list,
     policy_outputs = {}
     for i in seeds:
         for j in range(num_reps):
-            # filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_{instance.hosp_beds}_sim_updated.json"
+            # filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_{instance.total_hosp_beds}_sim_updated.json"
             filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_sim_updated.json"
             with open(filename) as file:
                 data = json.load(file)
@@ -399,7 +399,7 @@ def import_stoch_reps_for_reporting(seeds: list,
                         print('The data is not outputted')
                         pass
 
-            # policy_filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_{instance.hosp_beds}_policy.json"
+            # policy_filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_{instance.total_hosp_beds}_policy.json"
             policy_filename = f"{base_path}/{i}_{j + 1}_{history_end_date.date()}_{policy_name}_policy.json"
             with open(policy_filename) as file:
                 policy_data = json.load(file)
