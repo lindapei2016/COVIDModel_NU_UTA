@@ -115,7 +115,7 @@ plot.horizontal_plot(policy_outputs["lockdown_thresholds"][0], tier_colors_ctp)
 ICU_hist = sim_outputs["ICU_history"]
 real_ICU_hist = austin.real_ICU_history
 plot_icu_dali = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtp), central_path_id)
-plot_icu_dali.dali_plot(policy_outputs["tier_history"], tier_colors_ctp, austin.icu)
+plot_icu_dali.dali_plot(policy_outputs["tier_history"], tier_colors_ctp, austin.dedicated_covid_icu)
 
 # You can instead plot ICU with vertical background:
 plot_icu_vertical = Plot(austin, history_end_time, real_ICU_hist, ICU_hist, "ICU_history", str(mtp), central_path_id)

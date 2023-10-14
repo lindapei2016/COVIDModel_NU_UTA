@@ -155,36 +155,37 @@ non_surge_hosp_adm_thresholds_array = Tools_Optimization.thresholds_generator((-
                                                                               (-1, 0, 1),
                                                                               (0, 51, 1),
                                                                               (0, 51, 1))
+
 non_surge_staffed_thresholds_array = Tools_Optimization.thresholds_generator((-1, 0, 1),
                                                                              (-1, 0, 1),
-                                                                             (0, .51, .01),
-                                                                             (0, .51, .01))
+                                                                             (0, .31, .01),
+                                                                             (0, .31, .01))
 
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-    staffed_thresholds = {"non_surge": (np.inf,
-                                        np.inf,
-                                        np.inf),
-                          "surge": (-1,
-                                    -1,
-                                    np.inf)}
-    pre_vaccine_policy = CDCTierPolicy(austin,
-                                       pre_vaccine_tiers,
-                                       case_threshold,
-                                       hosp_adm_thresholds,
-                                       staffed_thresholds)
-    post_vaccine_policy = CDCTierPolicy(austin,
-                                        post_vaccine_tiers,
-                                        case_threshold,
-                                        hosp_adm_thresholds,
-                                        staffed_thresholds)
-    pre_vaccine_policies.append(pre_vaccine_policy)
-    post_vaccine_policies.append(post_vaccine_policy)
+# for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+#     hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+#                                          non_surge_hosp_adm_thresholds[3],
+#                                          non_surge_hosp_adm_thresholds[4]),
+#                            "surge": (-1,
+#                                      -1,
+#                                      non_surge_hosp_adm_thresholds[3])}
+#     staffed_thresholds = {"non_surge": (np.inf,
+#                                         np.inf,
+#                                         np.inf),
+#                           "surge": (-1,
+#                                     -1,
+#                                     np.inf)}
+#     pre_vaccine_policy = CDCTierPolicy(austin,
+#                                        pre_vaccine_tiers,
+#                                        case_threshold,
+#                                        hosp_adm_thresholds,
+#                                        staffed_thresholds)
+#     post_vaccine_policy = CDCTierPolicy(austin,
+#                                         post_vaccine_tiers,
+#                                         case_threshold,
+#                                         hosp_adm_thresholds,
+#                                         staffed_thresholds)
+#     pre_vaccine_policies.append(pre_vaccine_policy)
+#     post_vaccine_policies.append(post_vaccine_policy)
 
 for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
     hosp_adm_thresholds = {"non_surge": (np.inf,

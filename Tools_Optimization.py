@@ -315,7 +315,7 @@ def evaluate_one_policy_one_sample_path(
     stage2_days = np.sum(np.array(sim_rep.policy.tier_history) == 1)
     stage3_days = np.sum(np.array(sim_rep.policy.tier_history) == 2)
 
-    ICU_difference = np.array(sim_rep.ICU_history).sum(axis=(1, 2))[sim_rep.fixed_kappa_end_date:] - sim_rep.instance.icu
+    ICU_difference = np.array(sim_rep.ICU_history).sum(axis=(1, 2))[sim_rep.fixed_kappa_end_date:] - sim_rep.instance.dedicated_covid_icu
     ICU_violation_patient_days = np.sum(ICU_difference[ICU_difference >= 0])
 
     surge_days = np.sum([i for i in sim_rep.policy.surge_history if i is not None])

@@ -595,7 +595,7 @@ def plot_from_file(seeds, num_reps, instance, real_history_end_date, equivalent_
 
         if key == "ICU_history":
             plot = Plot(instance, real_history_end_date, real_data, val, key, policy_name, central_path_id)
-            plot.dali_plot(policy_outputs["tier_history"], tier_colors, instance.icu)
+            plot.dali_plot(policy_outputs["tier_history"], tier_colors, instance.dedicated_covid_icu)
 
         elif key == "ToIHT_history":
             if "surge_history" in policy_outputs.keys():

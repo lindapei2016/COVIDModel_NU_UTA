@@ -242,7 +242,7 @@ class SimReplication:
         # Check whether ICU capacity has been violated
         if np.any(
                 np.array(self.ICU_history).sum(axis=(1, 2))[self.t_historical_data_end:]
-                > self.instance.icu
+                > self.instance.dedicated_covid_icu
         ):
             return False
         else:
