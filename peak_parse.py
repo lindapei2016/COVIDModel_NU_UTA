@@ -20,57 +20,243 @@ base_path = Path(__file__).parent
 
 ###############################################################################
 
+merge_additional_policies = False
+merge_task_files = False
+merge_successive_reps = True
+need_parse = False
 
-# Combining first 300 replications from all policies with next 700 replications
-#   from surviving policies
+###############################################################################
 
-folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_3000Reps"
+# Adding additional policies
+# 2500 from KN survivors for peaks 0, 1, 2
+# 2400 from KN survivors for across-peaks
+# And then get rid of duplicate policy 7451
 
-prefix1 = "all3000_"
-prefix2 = "4_1000_"
+if merge_additional_policies:
+    folder_name = "500F"
 
-for peak in np.arange(3):
+    prefix1 = "2500_"
+    prefix2 = "across_peak_policies_"
 
-    stage2_days_df_1 = pd.read_csv(
-        base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
-        index_col=0)
-    stage3_days_df_1 = pd.read_csv(
-        base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
-        index_col=0)
-    ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
-                                                (prefix1 + "aggregated_peak" + str(peak) +
-                                                 "_ICU_violation_patient_days.csv"),
-                                                index_col=0)
+    for peak in np.arange(3):
 
-    stage2_days_df_2 = pd.read_csv(
-        base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
-        index_col=0)
-    stage3_days_df_2 = pd.read_csv(
-        base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
-        index_col=0)
-    ICU_violation_patient_days_df_2 = pd.read_csv(base_path / folder_name /
-                                                (prefix2 + "aggregated_peak" + str(peak) +
-                                                 "_ICU_violation_patient_days.csv"),
-                                                index_col=0)
+        stage2_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+            index_col=0)[:2400]
+        stage3_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+            index_col=0)[:2400]
+        ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
+                                                    (prefix1 + "aggregated_peak" + str(peak) +
+                                                     "_ICU_violation_patient_days.csv"),
+                                                    index_col=0)[:2400]
 
-    stage2_days_df = pd.concat([stage2_days_df_1[stage2_days_df_2.columns], stage2_days_df_2], axis=0)
-    stage3_days_df = pd.concat([stage3_days_df_1[stage3_days_df_2.columns], stage3_days_df_2])
-    ICU_violation_patient_days_df = pd.concat([ICU_violation_patient_days_df_1[ICU_violation_patient_days_df_2.columns],
-                                               ICU_violation_patient_days_df_2])
+        stage2_days_df_2 = pd.read_csv(
+            base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+            index_col=0)
+        stage3_days_df_2 = pd.read_csv(
+            base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+            index_col=0)
+        ICU_violation_patient_days_df_2 = pd.read_csv(base_path / folder_name /
+                                                    (prefix2 + "aggregated_peak" + str(peak) +
+                                                     "_ICU_violation_patient_days.csv"),
+                                                    index_col=0)
 
-    # print(stage2_days_df[:300].mean() - stage2_days_df[300:].mean())
-    # print(stage3_days_df[:300].mean() - stage3_days_df[300:].mean())
-    # print(ICU_violation_patient_days_df[:300].mean() - ICU_violation_patient_days_df[300:].mean())
+        stage2_days_df_2.drop(columns="7451", inplace=True)
+        stage3_days_df_2.drop(columns="7451", inplace=True)
+        ICU_violation_patient_days_df_2.drop(columns="7451", inplace=True)
 
-    stage2_days_df.reset_index(drop=True, inplace=True)
-    stage3_days_df.reset_index(drop=True, inplace=True)
-    ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
+        breakpoint()
 
-    stage2_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_stage2_days.csv")
-    stage3_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_stage3_days.csv")
-    ICU_violation_patient_days_df.to_csv("all4000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+        stage2_days_df_1.reset_index(drop=True, inplace=True)
+        stage3_days_df_1.reset_index(drop=True, inplace=True)
+        ICU_violation_patient_days_df_1.reset_index(drop=True, inplace=True)
+
+        stage2_days_df_2.reset_index(drop=True, inplace=True)
+        stage3_days_df_2.reset_index(drop=True, inplace=True)
+        ICU_violation_patient_days_df_2.reset_index(drop=True, inplace=True)
+
+        stage2_days_df = pd.concat([stage2_days_df_1, stage2_days_df_2], axis=1)
+        stage3_days_df = pd.concat([stage3_days_df_1, stage3_days_df_2], axis=1)
+        ICU_violation_patient_days_df = pd.concat([ICU_violation_patient_days_df_1, ICU_violation_patient_days_df_2], axis=1)
+
+        stage2_days_df.reset_index(drop=True, inplace=True)
+        stage3_days_df.reset_index(drop=True, inplace=True)
+        ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
+
+        stage2_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_stage2_days.csv")
+        stage3_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_stage3_days.csv")
+        ICU_violation_patient_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()
+
+###############################################################################
+
+if merge_task_files:
+    # Merge task-separated files
+    folder_name = "across_peak_policies_to_simulate_aggregated"
+
+    prefix = "task"
+
+    stage2_days_df_list = []
+    stage3_days_df_list = []
+    ICU_violation_patient_days_df_list = []
+
+    for peak in np.arange(3):
+        for task in np.arange(25):
+            stage2_days_df = pd.read_csv(
+                base_path / folder_name / (prefix + str(task) + "_aggregated_peak" + str(peak) + "_stage2_days.csv"),
+                index_col=0)
+            stage3_days_df = pd.read_csv(
+                base_path / folder_name / (prefix + str(task) + "_aggregated_peak" + str(peak) + "_stage3_days.csv"),
+                index_col=0)
+            ICU_violation_patient_days_df = pd.read_csv(base_path / folder_name /
+                                                        (prefix + str(task) + "_aggregated_peak" + str(peak) +
+                                                         "_ICU_violation_patient_days.csv"), index_col=0)
+
+            stage2_days_df_list.append(stage2_days_df)
+            stage3_days_df_list.append(stage3_days_df)
+            ICU_violation_patient_days_df_list.append(ICU_violation_patient_days_df)
+
+        stage2_days_df = pd.concat(stage2_days_df_list)
+        stage3_days_df = pd.concat(stage3_days_df_list)
+        ICU_violation_patient_days_df = pd.concat(ICU_violation_patient_days_df_list)
+
+        stage2_days_df.to_csv("across_peak_policies_aggregated_peak" + str(peak) + "_stage2_days.csv")
+        stage3_days_df.to_csv("across_peak_policies_aggregated_peak" + str(peak) + "_stage3_days.csv")
+        ICU_violation_patient_days_df.to_csv("across_peak_policies_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+
+###############################################################################
+
+if merge_successive_reps:
+    # Combining first 300 replications from all policies with next 700 replications
+    #   from surviving policies
+
+    folder_name = "600G"
+
+    prefix1 = "600G_"
+    prefix2 = "fixed_2400_"
+
+    for peak in np.arange(3):
+
+        stage2_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+            index_col=0)
+        stage3_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+            index_col=0)
+        ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
+                                                    (prefix1 + "aggregated_peak" + str(peak) +
+                                                     "_ICU_violation_patient_days.csv"),
+                                                    index_col=0)
+
+        stage2_days_df_2 = pd.read_csv(
+            base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+            index_col=0)
+        stage3_days_df_2 = pd.read_csv(
+            base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+            index_col=0)
+        ICU_violation_patient_days_df_2 = pd.read_csv(base_path / folder_name /
+                                                    (prefix2 + "aggregated_peak" + str(peak) +
+                                                     "_ICU_violation_patient_days.csv"),
+                                                    index_col=0)
+
+        stage2_days_df_2 = stage2_days_df_2[stage2_days_df_1.columns]
+        stage3_days_df_2 = stage3_days_df_2[stage3_days_df_1.columns]
+        ICU_violation_patient_days_df_2 = ICU_violation_patient_days_df_2[ICU_violation_patient_days_df_1.columns]
+
+        stage2_days_df = pd.concat([stage2_days_df_1[stage2_days_df_2.columns], stage2_days_df_2], axis=0)
+        stage3_days_df = pd.concat([stage3_days_df_1[stage3_days_df_2.columns], stage3_days_df_2])
+        ICU_violation_patient_days_df = pd.concat([ICU_violation_patient_days_df_1[ICU_violation_patient_days_df_2.columns], ICU_violation_patient_days_df_2])
+
+        # print(stage2_days_df[:300].mean() - stage2_days_df[300:].mean())
+        # print(stage3_days_df[:300].mean() - stage3_days_df[300:].mean())
+        # print(ICU_violation_patient_days_df[:300].mean() - ICU_violation_patient_days_df[300:].mean())
+
+        stage2_days_df.reset_index(drop=True, inplace=True)
+        stage3_days_df.reset_index(drop=True, inplace=True)
+        ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
+
+        stage2_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_stage2_days.csv")
+        stage3_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_stage3_days.csv")
+        ICU_violation_patient_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+
+breakpoint()
+
+###############################################################################
+
+# Just the parsing stuff from the CDCoptimization scripts
+
+# Step 6: parsing
+
+# Create 2 sets of dataframes
+# Set A: 1 dataframe for each policy -- columns are cost, feasibility,
+#   ICU patient-days violation, stage1 days, stage2 days, stage3 days
+#   (each of the 6 performance measures), rows are replications
+# Set B: 1 dataframe for each performance measure, -- columns are
+#   policies, rows are replications
+
+# Edit: kept the functionality to generate Set A, but
+#   it's quite slow, and Set B is more useful. Plus Set A can be
+#   generated from Set B, so it's unnecessary.
+
+split_peaks_amongst_processors = False
+need_set_A = False
+
+if need_parse:
+    for peak in np.arange(3):
+
+        # Set A
+        # policy_dict is a dictionary of dictionaries to contain
+        #   performance measures for each policy
+        if need_set_A:
+            policy_dict = {}
+
+        # Set B
+        ICU_violation_patient_days_dict = {}
+        stage2_days_dict = {}
+        stage3_days_dict = {}
+
+        performance_measures_dicts = [ICU_violation_patient_days_dict, stage2_days_dict, stage3_days_dict]
+
+        ICU_violation_patient_days_filenames = glob.glob("peak" + str(peak) + "*ICU_violation_patient_days.csv")
+        stage2_days_filenames = glob.glob("peak" + str(peak) + "*stage2_days.csv")
+        stage3_days_filenames = glob.glob("peak" + str(peak) + "*stage3_days.csv")
+
+        num_performance_measures = len(performance_measures_dicts)
+
+        performance_measures_filenames = [ICU_violation_patient_days_filenames, stage2_days_filenames,
+                                          stage3_days_filenames]
+
+        # These become the column names for dataframes in Set A
+        performance_measures_strs = ["icu_violation_patient_days", "stage2_days", "stage3_days"]
+
+        # Open each .csv file and store its contents in various dataframes
+        for performance_measures_id in range(num_performance_measures):
+            for filename in performance_measures_filenames[performance_measures_id]:
+                df = pd.read_csv(filename, header=None)
+                policy_id = int(filename.split("peak" + str(peak) + "_policy")[-1].split("_")[0])
+
+                if need_set_A:
+                    if policy_id in policy_dict.keys():
+                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
+                    else:
+                        policy_dict[policy_id] = {}
+                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
+
+                performance_measures_dicts[performance_measures_id][policy_id] = np.asarray(df[0])
+
+        # Generate and export Set A dataframes
+        if need_set_A:
+            for key in policy_dict.keys():
+                df = pd.DataFrame(policy_dict[key])
+                df.to_csv("aggregated_peak" + str(peak) + "_policy" + str(key) + ".csv")
+
+        # Generate and export Set B dataframes
+        for performance_measures_id in range(num_performance_measures):
+            df = pd.DataFrame(performance_measures_dicts[performance_measures_id])
+            df.to_csv(
+                "aggregated_peak" + str(peak) + "_" + str(performance_measures_strs[performance_measures_id]) + ".csv")
 
 ###############################################################################
 
@@ -167,87 +353,4 @@ for peak in np.arange(2,4):
 
 breakpoint()
 
-###############################################################################
 
-# Just the parsing stuff from the CDCoptimization scripts
-
-# Step 6: parsing
-
-# Create 2 sets of dataframes
-# Set A: 1 dataframe for each policy -- columns are cost, feasibility,
-#   ICU patient-days violation, stage1 days, stage2 days, stage3 days
-#   (each of the 6 performance measures), rows are replications
-# Set B: 1 dataframe for each performance measure, -- columns are
-#   policies, rows are replications
-
-# Edit: kept the functionality to generate Set A, but
-#   it's quite slow, and Set B is more useful. Plus Set A can be
-#   generated from Set B, so it's unnecessary.
-
-split_peaks_amongst_processors = False
-rank = 0
-
-need_parse = True
-
-need_set_A = False
-
-if need_parse:
-    for peak in [0]:
-
-        if split_peaks_amongst_processors:
-            if rank >= 4:
-                break
-            else:
-                peak = rank
-
-        # Set A
-        # policy_dict is a dictionary of dictionaries to contain
-        #   performance measures for each policy
-        if need_set_A:
-            policy_dict = {}
-
-        # Set B
-        ICU_violation_patient_days_dict = {}
-        stage2_days_dict = {}
-        stage3_days_dict = {}
-
-        performance_measures_dicts = [ICU_violation_patient_days_dict, stage2_days_dict, stage3_days_dict]
-
-        ICU_violation_patient_days_filenames = glob.glob("peak" + str(peak) + "*ICU_violation_patient_days.csv")
-        stage2_days_filenames = glob.glob("peak" + str(peak) + "*stage2_days.csv")
-        stage3_days_filenames = glob.glob("peak" + str(peak) + "*stage3_days.csv")
-
-        num_performance_measures = len(performance_measures_dicts)
-
-        performance_measures_filenames = [ICU_violation_patient_days_filenames, stage2_days_filenames,
-                                          stage3_days_filenames]
-
-        # These become the column names for dataframes in Set A
-        performance_measures_strs = ["icu_violation_patient_days", "stage2_days", "stage3_days"]
-
-        # Open each .csv file and store its contents in various dataframes
-        for performance_measures_id in range(num_performance_measures):
-            for filename in performance_measures_filenames[performance_measures_id]:
-                df = pd.read_csv(filename, header=None)
-                policy_id = int(filename.split("peak" + str(peak) + "_policy")[-1].split("_")[0])
-
-                if need_set_A:
-                    if policy_id in policy_dict.keys():
-                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
-                    else:
-                        policy_dict[policy_id] = {}
-                        policy_dict[policy_id][performance_measures_strs[performance_measures_id]] = np.asarray(df[0])
-
-                performance_measures_dicts[performance_measures_id][policy_id] = np.asarray(df[0])
-
-        # Generate and export Set A dataframes
-        if need_set_A:
-            for key in policy_dict.keys():
-                df = pd.DataFrame(policy_dict[key])
-                df.to_csv("aggregated_peak" + str(peak) + "_policy" + str(key) + ".csv")
-
-        # Generate and export Set B dataframes
-        for performance_measures_id in range(num_performance_measures):
-            df = pd.DataFrame(performance_measures_dicts[performance_measures_id])
-            df.to_csv(
-                "aggregated_peak" + str(peak) + "_" + str(performance_measures_strs[performance_measures_id]) + ".csv")

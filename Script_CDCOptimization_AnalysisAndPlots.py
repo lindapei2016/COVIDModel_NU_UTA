@@ -31,16 +31,24 @@ base_path = Path(__file__).parent
 # Will use the latter dataframe for tables of the optimal
 #   solutions
 
-aggregated_files_folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_4000Reps"
+# aggregated_files_folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_4000Reps"
+aggregated_files_folder_name = "500F"
+# aggregated_files_folder_name = "coordinate"
 
-full_df_files_prefix = "4000reps_"
+# full_df_files_prefix = "4000reps_"
 # full_df_files_prefix = "300reps_"
+full_df_files_prefix = "fixed_2400reps_"
+# full_df_files_prefix = "coordinate_"
 
-need_plot_correlation = True
-correlation_files_folder_name = "CDC_tier_history"
+need_table_optimal_policy = True
+need_plot_optimal_policy = False
+optimal_policy_files_folder_name = "optimal"
 
-need_table_best_policies = False
-need_table_cross_validation_peaks = False
+need_plot_correlation = False
+correlation_files_folder_name = "CDC"
+
+need_table_best_policies = True
+need_table_cross_validation_peaks = True
 
 need_plot_changing_coordinate = False
 need_plot_pareto = False
@@ -79,14 +87,22 @@ full_df_across_peaks = pd.read_csv(
 # for full_df_across_peaks -- these are sample means across peaks
 # cost depends on weights for blue/yellow/red days and for ICU violation penalty
 
-breakpoint()
+#######################################################
+############## OPTIMAL POLICY ANALYSIS ################
+#######################################################
 
-#################################################
-############## CORRELATION PLOTS ################
-#################################################
+# Get a table on...
+# Average start time of lockdown
+# Average end time of lockdown
+# Average number of lockdowns
+# Avarege length of longest lockdowns
+
+# Also want Dali plot?
 
 peaks_start_times = [93, 276, 502, 641]
 peaks_end_times = [215, 397, 625, 762]
+
+peaks_total_hosp_beds = [3026, 3791, 3841, 3537]
 
 # manually summed from austin_setup.json file
 population_total = 128527 + 9350 + 327148 + 37451 + 915894 + 156209 + 249273 + 108196 + 132505 + 103763
@@ -94,25 +110,40 @@ population_total = 128527 + 9350 + 327148 + 37451 + 915894 + 156209 + 249273 + 1
 # Maps peaks to lists of lists
 tier_history_dict = {}
 ICU_history_dict = {}
-hospital_admits_history_dict = {}
+IH_history_dict = {}
+ToIHT_history_dict = {}
 
-if need_plot_correlation:
+first_stage3_day_dict = {}
+
+if need_table_optimal_policy:
     for peak in np.arange(3):
-
-        tier_history_filenames = glob.glob("**/*rank0_peak" + str(peak) + "*CDC*tier_history*")
+        first_stage3_day_list = []
+        tier_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*optimalpolicyacrosspeaks*tier_history*")
         tier_history_dict[peak] = []
         for filename in tier_history_filenames:
-            tier_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None))[peaks_start_times[peak]:])
+            tier_history = np.asarray(pd.read_csv(filename, header=None))[peaks_start_times[peak]:]
+            tier_history_dict[peak].append(tier_history)
+            first_stage3_day_list.append(np.argwhere(tier_history == 2)[0][0])
+        first_stage3_day_dict[peak] = first_stage3_day_list
+        print(np.average(np.array(first_stage3_day_list)))
 
-        ICU_history_filenames = glob.glob("**/*rank0_peak" + str(peak) + "*CDC*ICU_history*")
+if need_plot_optimal_policy:
+    for peak in np.arange(3):
+
+        ICU_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*optimalpolicyacrosspeaks*ICU_history*")
         ICU_history_dict[peak] = []
         for filename in ICU_history_filenames:
             ICU_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).mean())[peaks_start_times[peak]:])
 
-        hospital_admits_history_filenames = glob.glob("**/*rank0_peak" + str(peak) + "*CDC*hospital_admits*")
-        hospital_admits_history_dict[peak] = []
-        for filename in hospital_admits_history_filenames:
-            hospital_admits_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).sum())[peaks_start_times[peak]:]*1e5/population_total)
+        IH_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*optimalpolicyacrosspeaks*IH_history*")
+        IH_history_dict[peak] = []
+        for filename in IH_history_filenames:
+            IH_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).mean())[peaks_start_times[peak]:])
+
+        ToIHT_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*optimalpolicyacrosspeaks*ToIHT_history*")
+        ToIHT_history_dict[peak] = []
+        for filename in ToIHT_history_filenames:
+            ToIHT_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).sum())[peaks_start_times[peak]:]*1e5/population_total)
 
         t = np.arange(peaks_end_times[peak] - peaks_start_times[peak])
 
@@ -120,23 +151,113 @@ if need_plot_correlation:
         color = 'tab:cyan'
         ax1.set_xlabel('Days since start of peak')
         ax1.set_ylabel('Percent staffed beds occupied (7-day avg)')
-        for rep in np.arange(100):
+        for rep in np.arange(50):
             if rep == 0:
-                ax1.plot(t, ICU_history_dict[peak][rep] / 1100, color=color, alpha=0.2, label="Staffed beds")
+                ax1.plot(t, (ICU_history_dict[peak][rep] + IH_history_dict[peak][rep]) / peaks_total_hosp_beds[peak], color=color, alpha=0.2, label="Staffed beds")
             else:
-                ax1.plot(t, ICU_history_dict[peak][rep]/1100, color=color, alpha=0.2)
+                ax1.plot(t, (ICU_history_dict[peak][rep] + IH_history_dict[peak][rep]) / peaks_total_hosp_beds[peak], color=color, alpha=0.2)
         ax1.tick_params(axis='y')
 
         ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
         ax1.legend(loc=2)
 
         color = 'tab:purple'
-        ax2.set_ylabel('Hospital admits (7-day avg per 100k)')  # we already handled the x-label with ax1
-        for rep in np.arange(100):
+        ax2.set_ylabel('Hospital admits (7-day sum per 100k)')  # we already handled the x-label with ax1
+        for rep in np.arange(50):
             if rep == 0:
-                ax2.plot(t, hospital_admits_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3, label="Hospital admits")
+                ax2.plot(t, ToIHT_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3, label="Hospital admits")
             else:
-                ax2.plot(t, hospital_admits_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3)
+                ax2.plot(t, ToIHT_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3)
+        ax2.tick_params(axis='y')
+
+        fig.tight_layout()  # otherwise the right y-label is slightly clipped
+
+        ax1.set_title("Indicators under across-peak optimal policy for peak " + str(peak + 1))
+
+        ax1.margins(x=0)
+        ax2.margins(x=0)
+        ax1.margins(y=0)
+        ax2.margins(y=0)
+
+        ax2.legend(loc = 1)
+
+        plt.subplots_adjust(top=0.88)
+        plt.savefig("indicators_optimal_correlation_peak" + str(peak + 1) + ".png", dpi=1200)
+        plt.show()
+        breakpoint()
+
+#################################################
+############## CORRELATION PLOTS ################
+#################################################
+
+# Use IH + ICU for numerator of staffed beds (7 day avg)
+# Use ToIHT for hospital admissions! (7 day total)
+
+# For some reason I only have 50 reps, not sure why...
+#   but plots with 50 reps are fine too
+
+peaks_start_times = [93, 276, 502, 641]
+peaks_end_times = [215, 397, 625, 762]
+
+peaks_total_hosp_beds = [3026, 3791, 3841, 3537]
+
+# manually summed from austin_setup.json file
+population_total = 128527 + 9350 + 327148 + 37451 + 915894 + 156209 + 249273 + 108196 + 132505 + 103763
+
+# Maps peaks to lists of lists
+tier_history_dict = {}
+ICU_history_dict = {}
+IH_history_dict = {}
+ToIHT_history_dict = {}
+
+if need_plot_correlation:
+    for peak in np.arange(3):
+
+        # breakpoint()
+
+        tier_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*CDCimplementation*tier_history*")
+        tier_history_dict[peak] = []
+        for filename in tier_history_filenames:
+            tier_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None))[peaks_start_times[peak]:])
+
+        ICU_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*CDCimplementation*ICU_history*")
+        ICU_history_dict[peak] = []
+        for filename in ICU_history_filenames:
+            ICU_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).mean())[peaks_start_times[peak]:])
+
+        IH_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*CDCimplementation*IH_history*")
+        IH_history_dict[peak] = []
+        for filename in IH_history_filenames:
+            IH_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).mean())[peaks_start_times[peak]:])
+
+        ToIHT_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*CDCimplementation*ToIHT_history*")
+        ToIHT_history_dict[peak] = []
+        for filename in ToIHT_history_filenames:
+            ToIHT_history_dict[peak].append(np.asarray(pd.read_csv(filename, header=None).rolling(7).sum())[peaks_start_times[peak]:]*1e5/population_total)
+
+        t = np.arange(peaks_end_times[peak] - peaks_start_times[peak])
+
+        fig, ax1 = plt.subplots(layout="constrained")
+        color = 'tab:cyan'
+        ax1.set_xlabel('Days since start of peak')
+        ax1.set_ylabel('Percent staffed beds occupied (7-day avg)')
+        for rep in np.arange(50):
+            if rep == 0:
+                ax1.plot(t, (ICU_history_dict[peak][rep] + IH_history_dict[peak][rep]) / peaks_total_hosp_beds[peak], color=color, alpha=0.2, label="Staffed beds")
+            else:
+                ax1.plot(t, (ICU_history_dict[peak][rep] + IH_history_dict[peak][rep]) / peaks_total_hosp_beds[peak], color=color, alpha=0.2)
+        ax1.tick_params(axis='y')
+
+        ax2 = ax1.twinx()  # instantiate a second axes that shares the same x-axis
+        ax1.legend(loc=2)
+
+        color = 'tab:purple'
+        ax2.set_ylabel('Hospital admits (7-day sum per 100k)')  # we already handled the x-label with ax1
+        for rep in np.arange(50):
+            if rep == 0:
+                ax2.plot(t, ToIHT_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3, label="Hospital admits")
+            else:
+                ax2.plot(t, ToIHT_history_dict[peak][rep], color=color, linestyle="--", alpha=0.3)
         ax2.tick_params(axis='y')
 
         fig.tight_layout()  # otherwise the right y-label is slightly clipped
@@ -369,8 +490,16 @@ if need_table_cross_validation_peaks:
 ############## COORDINATE PLOTS ################
 ################################################
 
+# We accidentally simulated (1, 14, np.inf, np.inf) twice in the way we generated policies, oops
+# One of them seemed to get bad random variates and was pretty noisy and had a slightly higher cost
+#   (although distribution of days in each stage was basically the same)
+# Dropped the higher cost one
+
 if need_plot_changing_coordinate:
-    vary_threshold1_df = get_df_of_perturbations((3, 14, np.inf, np.inf), "hosp1", np.arange(13), full_df_across_peaks)
+
+    full_df_across_peaks.drop(index=1, inplace=True)
+
+    vary_threshold1_df = get_df_of_perturbations((1, 14, np.inf, np.inf), "hosp1", np.arange(1,15), full_df_across_peaks)
 
     title = "Hospital-admits-only policies with optimal 2nd threshold (at 14)"
     xlabel = "1st threshold"
@@ -385,13 +514,15 @@ if need_plot_changing_coordinate:
                                   ylabel,
                                   title)
 
+    # breakpoint()
+
     # Adding economic and health costs and corresponding standard errors to vary_threshold1_df
     vary_threshold1_df["econ_cost"] = 1 * vary_threshold1_df["stage1"] + 10 * vary_threshold1_df["stage2"] + 100 * \
                                       vary_threshold1_df["stage3"]
     vary_threshold1_df["econ_cost_stderror"] = 10 * vary_threshold1_df["stage2_stderror"] + 100 * vary_threshold1_df[
         "stage3_stderror"]
-    vary_threshold1_df["health_cost"] = 330 * vary_threshold1_df["violation"]
-    vary_threshold1_df["health_cost_stderror"] = 330 * vary_threshold1_df["violation_stderror"]
+    vary_threshold1_df["health_cost"] = 503 * vary_threshold1_df["violation"]
+    vary_threshold1_df["health_cost_stderror"] = 503 * vary_threshold1_df["violation_stderror"]
 
     title = "Hospital-admits-only policies with optimal 2nd threshold (at 14)"
     xlabel = "1st threshold"
@@ -406,11 +537,11 @@ if need_plot_changing_coordinate:
                                   ylabel,
                                   title)
 
-    title = "Hospital-admits-only policies with optimal 1st threshold (at 3)"
+    title = "Hospital-admits-only policies with optimal 1st threshold (at 1)"
     xlabel = "2nd threshold"
     ylabel = "Number of days (average)"
 
-    vary_threshold2_df = get_df_of_perturbations((3, 20, np.inf, np.inf), "hosp2", np.arange(20), full_df_across_peaks)
+    vary_threshold2_df = get_df_of_perturbations((1, 14, np.inf, np.inf), "hosp2", np.arange(1, 16), full_df_across_peaks)
 
     make_plot_changing_coordinate("hosp2",
                                   ("stage2", "stage3", "violation"),
@@ -426,10 +557,10 @@ if need_plot_changing_coordinate:
                                       vary_threshold2_df["stage3"]
     vary_threshold2_df["econ_cost_stderror"] = 10 * vary_threshold2_df["stage2_stderror"] + 100 * vary_threshold2_df[
         "stage3_stderror"]
-    vary_threshold2_df["health_cost"] = 330 * vary_threshold2_df["violation"]
-    vary_threshold2_df["health_cost_stderror"] = 330 * vary_threshold2_df["violation_stderror"]
+    vary_threshold2_df["health_cost"] = 503 * vary_threshold2_df["violation"]
+    vary_threshold2_df["health_cost_stderror"] = 503 * vary_threshold2_df["violation_stderror"]
 
-    title = "Hospital-admits-only policies with optimal 1st threshold (at 3)"
+    title = "Hospital-admits-only policies with optimal 1st threshold (at 1)"
     xlabel = "2nd threshold"
     ylabel = "Number of days (average)"
     make_plot_changing_coordinate("hosp2",
@@ -441,6 +572,8 @@ if need_plot_changing_coordinate:
                                   xlabel,
                                   ylabel,
                                   title)
+
+    breakpoint()
 
 ############################################
 ############## PARETO PLOTS ################
@@ -465,7 +598,8 @@ if need_plot_pareto:
     cost_argmins = []
 
     for w in np.concatenate((np.arange(1, 1001), np.arange(2, 11) * 1000)):
-        full_df_across_peaks_copy["cost"] = 10 * full_df_across_peaks_copy["stage2"] + \
+        full_df_across_peaks_copy["cost"] = 1 * full_df_across_peaks_copy["stage1"] + \
+                                            10 * full_df_across_peaks_copy["stage2"] + \
                                             100 * full_df_across_peaks_copy["stage3"] + \
                                             w * full_df_across_peaks_copy["violation"]
         cost_argmin = full_df_across_peaks_copy.sort_values("cost").index[0]
@@ -482,10 +616,6 @@ if need_plot_pareto:
 
         cost_argmins.append(cost_argmin)
 
-    # FYI based on analyzing cost_argmins -- at ICU penalty 78 onwards,
-    #   optimal policy coincides with our across-peak optimal policy under
-    #   ICU penalty w = 330 (which was chosen based on 300 replications
-    #   and 12172 policies, including many infeasible policies)
     # See note in slidedeck that if we were to compute optimal ICU penalty
     #   based on smaller set of policies (selected based on low cost and
     #   feasibility), the penalty would be smaller -- and that intuitively makes sense
@@ -587,9 +717,10 @@ if need_plot_pareto:
 ############## HEATMAP PLOTS ###############
 ############################################
 
-if need_plot_heatmap:
+# Maybe add "X" to infeasible policies?
+#
 
-    breakpoint()
+if need_plot_heatmap:
 
     # Heat map for 2652 single-indicator policies
     # First 1326 policies are hosp adms only
@@ -604,6 +735,7 @@ if need_plot_heatmap:
 
     # To hack this for-loop, I made peak 3 the across-peaks result (we have no peak 3 anymore)
     for peak in np.arange(4):
+    # for peak in [4]:
         # for peak in [3]:
 
         if peak < 3:
@@ -613,39 +745,25 @@ if need_plot_heatmap:
             base_df = full_df_across_peaks
             title_suffix = "across peaks"
 
-        hosp_df = base_df[:1326]
+        hosp_df = base_df[:161]
 
-        # Need to reshape into upper triangular array!
-        base_array = np.full((51, 51), 0)
-        upper_triangular_indices = np.triu_indices(51, m=51)
-
-        hosp_df.sort_values(by=["hosp1", "hosp2"], inplace=True)
+        base_array = np.full((21, 21), 0)
+        mask_array = np.full((21, 21), True)
         cost = hosp_df["cost"]
 
-        for i in np.arange(1326):
-            base_array[upper_triangular_indices[0][i]][upper_triangular_indices[1][i]] = cost.loc[i]
+        for i in np.arange(161):
+            base_array[int(hosp_df.iloc[i]["hosp1"])][int(hosp_df.iloc[i]["hosp2"])] = cost.iloc[i]
+            if cost.iloc[i] < 30000:
+                mask_array[int(hosp_df.iloc[i]["hosp1"])][int(hosp_df.iloc[i]["hosp2"])] = False
 
-        smaller_array = base_array[:20, :20]
-        mask_array = np.full((20, 20), False)
-        mask_array[np.tril_indices(20, m=20)] = True
-
-        # Note: we really do need to filter out bad policies
-        #   with cost greater than 12000 (corresponding to
-        #   all 120 days in red, ignoring ICU penalty) --
-        #   otherwise the resolution / color gradient is very
-        #   hard to distinguish
-        for i in range(20):
-            for j in range(20):
-                if smaller_array[i][j] > 12000:
-                    mask_array[i][j] = True
-
-        labels = np.full((20, 20), "", dtype="str")
-        labels[smaller_array == np.min(smaller_array[smaller_array > 0])] = "*"
+        labels = np.full((21, 21), "", dtype="str")
+        lowest_cost_policy_df = hosp_df.sort_values("cost").iloc[0]
+        labels[int(lowest_cost_policy_df["hosp1"])][int(lowest_cost_policy_df["hosp2"])] = "*"
 
         plt.clf()
-        s = sns.heatmap(smaller_array,
-                        xticklabels=np.arange(20),
-                        yticklabels=np.arange(20),
+        s = sns.heatmap(base_array,
+                        xticklabels=np.arange(21),
+                        yticklabels=np.arange(21),
                         cmap="magma_r",
                         mask=mask_array,
                         annot=labels,
@@ -657,46 +775,23 @@ if need_plot_heatmap:
 
         # Staffed beds only single-indicator policies
 
-        beds_df = base_df[1326:2652]
+        beds_df = base_df[161:int(161+45)]
 
-        # Need to reshape into upper triangular array!
-        base_array = np.full((51, 51), 0)
-        upper_triangular_indices = np.triu_indices(51, m=51)
-
-        beds_df.sort_values(by=["beds1", "beds2"], inplace=True)
+        base_array = np.full((11, 11), 0)
+        mask_array = np.full((11, 11), True)
         cost = beds_df["cost"]
 
-        for i in np.arange(1326):
-            base_array[upper_triangular_indices[0][i]][upper_triangular_indices[1][i]] = cost.loc[i + 1326]
+        for i in np.arange(45):
+            base_array[int(beds_df.iloc[i]["beds1"]*100)][int(beds_df.iloc[i]["beds2"]*100)] = cost.iloc[i]
+            if cost.iloc[i] < 30000:
+                mask_array[int(beds_df.iloc[i]["beds1"]*100)][int(beds_df.iloc[i]["beds2"]*100)] = False
 
-        matplotlib.cm.get_cmap("magma_r").set_bad("white")
-
-        smaller_array = base_array[:20, :50]
-        mask_array = np.full((20, 50), False)
-        mask_array[np.tril_indices(20, m=50)] = True
-
-        for i in range(20):
-            for j in range(50):
-                if smaller_array[i][j] > 12000:
-                    mask_array[i][j] = True
-
-        labels = np.full((20, 50), "", dtype="str")
-        labels[smaller_array == np.min(smaller_array[smaller_array > 0])] = "*"
-
-        smaller_array = pd.DataFrame(smaller_array)
-        smaller_array.index = np.arange(20)
-        smaller_array.columns = np.arange(50)
-        for col in smaller_array.columns:
-            if col > 35:
-                smaller_array.drop(columns=col, inplace=True)
-
-        mask_array = mask_array[:20, :36]
-        labels = labels[:20, :36]
+        labels = np.full((11, 11), "", dtype="str")
+        lowest_cost_policy_df = beds_df.sort_values("cost").iloc[0]
+        labels[int(lowest_cost_policy_df["beds1"] * 100)][int(lowest_cost_policy_df["beds2"] * 100)] = "*"
 
         plt.clf()
-        ax = sns.heatmap(smaller_array,
-                         # xticklabels=0.5,
-                         # yticklabels=np.arange(20) / 100,
+        ax = sns.heatmap(base_array,
                          cmap="magma_r",
                          mask=mask_array,
                          annot=labels,
