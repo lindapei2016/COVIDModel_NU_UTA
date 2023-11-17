@@ -179,8 +179,15 @@ class City:
                 data["start_date"], datetime_formater
             )
 
+            self.simulation_start_date = dt.datetime.strptime(
+                data["simulation_start_date"], datetime_formater
+            )
+
             self.end_date = dt.datetime.strptime(
                 data["end_date"], datetime_formater)
+
+            self.simulation_end_date = dt.datetime.strptime(
+                data["simulation_end_date"], datetime_formater)
 
             # the school_closure_period attribute is a list (of lists) indicating
             #   historical periods of school closure

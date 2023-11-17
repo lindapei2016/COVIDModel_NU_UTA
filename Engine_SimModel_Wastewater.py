@@ -23,7 +23,7 @@ def discrete_approx(rate, timestep):
 
 
 class SimReplication:
-    def __init__(self, instance, vaccine, policy, rng_seed):
+    def __init__(self, instance, vaccine, policy, rng_seed, flag_wastewater_policy=False):
         """
         :param instance: [obj] instance of City class
         :param vaccine: [obj] instance of Vaccine class
@@ -106,6 +106,14 @@ class SimReplication:
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
         self.wastewater_viral_load = []
         self.log_wastewater_viral_load = []
+        # Oct. 25, 2023, flag indicates if using wastewater in the policy
+        self.flag_wastewater_policy = flag_wastewater_policy
+        # week days for wastewater analysis
+        self.wastewater_analyzed_day = [2,4]
+        # time lag for wastewater analysis
+        self.wastewater_time_lag = 7
+        # total population for calbrienstick
+        self.population = 4653480
         # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
     def init_rng(self):
@@ -210,8 +218,9 @@ class SimReplication:
             attached policy's enforced tiers (returns None
             if there is no attached policy)
         """
-
+        #print("debug self.policy: {}".format(self.policy))
         if self.policy:
+            #print(self.policy.tier_history)
             return sum(
                 self.policy.tiers[i]["daily_cost"]
                 for i in self.policy.tier_history
@@ -242,7 +251,24 @@ class SimReplication:
         # Check whether ICU capacity has been violated
         if np.any(
                 np.array(self.ICU_history).sum(axis=(1, 2))[self.t_historical_data_end:]
-                > self.instance.dedicated_covid_icu
+                > self.instance.icu
+        ):
+            return False
+        else:
+            return True
+
+    # Sonny, Nov. 13, 2023, second form of computing feasibility
+    def compute_feasibility_v2(self, t_start=0):
+        if self.policy is None:
+            return None
+        elif self.next_t < t_start:
+            return None
+
+
+        # Check whether ICU capacity has been violated
+        if np.any(
+                np.array(self.ICU_history).sum(axis=(1, 2))[t_start:]
+                > self.instance.icu
         ):
             return False
         else:
@@ -278,6 +304,25 @@ class SimReplication:
         )
 
         return rsq
+
+
+    # compute rsq of ToIHT
+    def compute_rsq_ToIHT(self):
+        f_benchmark = self.instance.real_ToIHT_history
+        ToIHT_sim = np.array(self.ToIHT_history)
+        ToIHT_sim = ToIHT_sim.sum(axis=(2, 1))
+        ToIHT_sim = ToIHT_sim[:self.t_historical_data_end]
+
+        if self.next_t < self.t_historical_data_end:
+            ToIHT_sim = ToIHT_sim[: self.next_t]
+            f_benchmark = f_benchmark[: self.next_t]
+
+        rsq = 1 - np.sum(((np.array(ToIHT_sim) - np.array(f_benchmark)) ** 2)) / sum(
+            (np.array(f_benchmark) - np.mean(np.array(f_benchmark))) ** 2
+        )
+
+        return rsq
+
 
     def simulate_time_period(self, time_end, fixed_kappa_end_date=0):
 
@@ -413,7 +458,10 @@ class SimReplication:
         t = t_date
 
         epi = copy.deepcopy(self.epi_rand)
-
+        #print("debug t: {}".format(t))
+        #print(fixed_kappa_end_date)
+        #print(fixed_kappa_end_date)
+        #print(t)
         if t <= fixed_kappa_end_date:
             # If the transmission reduction is fixed don't call the policy object.
             #print("debug")
@@ -422,6 +470,40 @@ class SimReplication:
                 self.instance.cal.schools_closed[t],
                 self.instance.cal.fixed_cocooning[t],
                 self.instance.cal.fixed_transmission_reduction[t],
+                N / N.sum(),
+                self.instance.cal._day_type[t],
+            )
+        elif self.flag_wastewater_policy == True: # policy for wastewater
+            #print("debug t: {}".format(t))
+            #print(self.policy.tier_history)
+            if self.policy.tier_history is None:
+                self.policy.tier_history = [None for _ in range(t)]
+            if t > self.wastewater_time_lag:
+                if calendar[t].isoweekday() in self.wastewater_analyzed_day:
+                    self.policy(t,
+                                self.ToIHT_history,
+                                self.IH_history,
+                                self.ToIY_history,
+                                self.ICU_history,
+                                self.wastewater_viral_load,
+                                self.wastewater_time_lag,
+                                self.population)
+                    current_tier = self.policy.tier_history[t]
+                else:
+                    if self.policy.tier_history[t-1] is None:
+                        current_tier = 0
+                    else:
+                        current_tier = self.policy.tier_history[t-1]
+                    if t >= len(self.policy.tier_history):
+                        self.policy.tier_history.append(current_tier)
+            else:
+                current_tier = 0
+                self.policy.tier_history.append(0)
+
+            phi_t = epi.effective_phi(
+                self.policy.tiers[current_tier]["school_closure"],
+                self.policy.tiers[current_tier]["cocooning"],
+                self.policy.tiers[current_tier]["transmission_reduction"],
                 N / N.sum(),
                 self.instance.cal._day_type[t],
             )
@@ -921,4 +1003,13 @@ class SimReplication:
             writeFile.write("{},".format(idx + 1))
             writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
             writeFile.write("{}\n".format(IHICU[idx]))
+        writeFile.close()
+
+    def output_tier_history(self, path):
+        writeFile = open(path, 'w')
+        writeFile.write(",date,tier\n")
+        for idx in range(len(self.policy.tier_history)):
+            writeFile.write("{},".format(idx + 1))
+            writeFile.write("{},".format((self.instance.start_date + dt.timedelta(days=idx)).strftime("%m/%d/%Y")))
+            writeFile.write("{}\n".format(self.policy.tier_history[idx]))
         writeFile.close()

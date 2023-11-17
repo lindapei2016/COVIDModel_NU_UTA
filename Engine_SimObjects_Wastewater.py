@@ -58,7 +58,6 @@ class CDCTierPolicy:
                  case_threshold,
                  hosp_adm_thresholds,
                  staffed_bed_thresholds,
-                 specified_total_hosp_beds=None,
                  percentage_cases=0.4):
         """
         :param instance:
@@ -75,9 +74,6 @@ class CDCTierPolicy:
                     surge : thresholds level when case counts is above the case threshold
                    }
         :param staffed_bed_thresholds: (dict of dict) similar entries as the hosp_adm_thresholds.
-        :param specified_total_hosp_beds [None] or [int]: if None, will use total_hosp_beds
-            from instance (from setup json file) as total hospital capacity. Otherwise,
-            will use specified integer instead.
         :param percentage_cases: the CDC system uses total case counts as an indicators. However, we don't have a direct
         interpretation of case counts in the model. We estimate the real total case count as some percentage of people
         entering symptomatic compartment (ToIY). We use percentage_case to adjust ToIY.
@@ -87,19 +83,16 @@ class CDCTierPolicy:
         self.case_threshold = case_threshold
         self.hosp_adm_thresholds = hosp_adm_thresholds
         self.staffed_bed_thresholds = staffed_bed_thresholds
-        self.specified_total_hosp_beds = specified_total_hosp_beds
         self.percentage_cases = percentage_cases
         self.tier_history = None
         self.surge_history = None
-        self.active_indicator_history = []
 
     def reset(self):
         self.tier_history = None
         self.surge_history = None
-        self.active_indicator_history = []
 
     def __repr__(self):
-        return f"CDC_{self.case_threshold}_{self.hosp_adm_thresholds['non_surge'][0]}_{self.staffed_bed_thresholds['non_surge'][0]}_{self.percentage_cases}"
+        return f"CDC_{self.case_threshold}"
 
     def __call__(self, t, ToIHT, IH, ToIY, ICU):
         N = self._instance.N
@@ -107,7 +100,6 @@ class CDCTierPolicy:
         if self.tier_history is None:
             self.tier_history = [None for i in range(t)]
             self.surge_history = [None for i in range(t)]
-            self.active_indicator_history = [None for i in range(t)]
         if len(self.tier_history) > t:
             return
 
@@ -117,7 +109,7 @@ class CDCTierPolicy:
         ICU = np.array(ICU)
 
         # Compute daily admissions moving sum
-        moving_avg_start = np.maximum(0, t - self._instance.moving_avg_len)
+        moving_avg_start = np.maximum(0, t - self._instance.config["moving_avg_len"])
         hos_adm_total = ToIHT.sum((1, 2))
         hosp_adm_sum = 100000 * hos_adm_total[moving_avg_start:].sum() / N.sum((0, 1))
 
@@ -128,10 +120,7 @@ class CDCTierPolicy:
 
         # Compute 7-day average percent of COVID beds:
         IH_total = IH.sum((1, 2)) + ICU.sum((1, 2))
-        if self.specified_total_hosp_beds is None:
-            IH_avg = IH_total[moving_avg_start:].mean() / self._instance.total_hosp_beds
-        else:
-            IH_avg = IH_total[moving_avg_start:].mean() / self.specified_total_hosp_beds
+        IH_avg = IH_total[moving_avg_start:].mean() / self._instance.hosp_beds
 
         current_tier = self.tier_history[t - 1]
 
@@ -154,13 +143,6 @@ class CDCTierPolicy:
 
         # choose the stricter tier among tiers the two indicators suggesting:
         new_tier = max(hosp_adm_tier, staffed_bed_tier)
-        # keep track of the active indicator for indicator statistics:
-        if hosp_adm_tier > staffed_bed_tier:
-            active_indicator = 0
-        elif hosp_adm_tier < staffed_bed_tier:
-            active_indicator = 1
-        else:
-            active_indicator = 2
 
         if current_tier != new_tier:  # bump to the next tier
             t_end = t + self.tiers[new_tier]["min_enforcing_time"]
@@ -170,7 +152,6 @@ class CDCTierPolicy:
 
         self.tier_history += [new_tier for i in range(t_end - t)]
         self.surge_history += [surge_state for i in range(t_end - t)]
-        self.active_indicator_history += [active_indicator for i in range(t_end - t)]
 
 
 class MultiTierPolicy:
@@ -274,6 +255,82 @@ class MultiTierPolicy:
             t_end = t + 1
 
         self.tier_history += [new_tier for i in range(t_end - t)]
+
+
+class MultiTierPolicy_Wastewater:
+    """
+        Wastewater-based tiers
+        A multi-tier policy allows for multiple tiers of lock-downs.
+        Attrs:
+            tiers (list of dict): a list of the tiers characterized by a dictionary
+                with the following entries:
+                    {
+                        "transmission_reduction": float [0,1)
+                        "cocooning": float [0,1)
+                        "school_closure": int {0,1}
+                    }
+
+            lockdown_thresholds (list of list): a list with the thresholds for every
+                tier. The list must have n-1 elements if there are n tiers. Each threshold
+                is a list of values for evert time step of simulation.
+
+    """
+    def __init__(self, instance, tiers, lockdown_thresholds):
+        #print("debug check")
+        self._instance = instance
+        self.tiers = tiers.tier
+        #print(self.tiers)
+        self.lockdown_thresholds = lockdown_thresholds
+        self.tier_history = None
+
+    def reset(self):
+        self.tier_history = None
+
+    def __repr__(self):
+        return str(self.lockdown_thresholds)
+
+    def __call__(self, t, ToIHT, IH, ToIY, ICU, wastewater_viral_load, time_lag, population):
+        """
+        Function that makes an instance of a policy callable.
+
+        """
+
+        N = self._instance.N
+
+        if len(self.tier_history) > t:
+            return
+        if self.tier_history is None:
+            self.tier_history = [None for i in range(t)]
+
+        wastewater_viral_load = np.array(wastewater_viral_load)
+
+        # obtain wastewater viral load <time_lag> days ago
+        t_sample = np.maximum(0, t - time_lag) # need to find the right way to rescale
+        criStat = wastewater_viral_load[t_sample] / population
+
+        # find new tier
+        new_tier = find_tier(self.lockdown_thresholds, criStat)
+
+        # Question? How to enforce constraints 3f
+        if len(self.tier_history) > 0:
+            current_tier = self.tier_history[t - 1]
+        else:
+            current_tier = new_tier
+
+        if current_tier != new_tier:  # bump to the next tier
+            t_end = t + self.tiers[new_tier]["min_enforcing_time"]
+        else:  # stay in same tier for one more time period
+            new_tier = current_tier
+            t_end = t + 1
+
+        self.tier_history += [new_tier for i in range(t_end - t)]
+        # (14 days)
+        # t new_tier = red, current_tier = orange
+        # [...] + [red, red, ... red ]  (len(tier_historty) > t)
+        # t + 1
+        # t + 1 new_tier = purple, current_tier = red
+        # [...]  + [red, red, ... red ] + [purple ... purple]
+
 
 
 class VaccineGroup:
