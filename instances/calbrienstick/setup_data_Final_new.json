@@ -1,9 +1,13 @@
 {
   "city": "calbrienstick",
   "start_date": "2020-01-02 00:00:00",
+  "simulation_start_date": "2020-01-02 00:00:00",
   "end_date": "2023-05-30 00:00:00",
-  "hosp_beds": 7053,
-  "icu": 1431,
+  "simulation_end_date": "2023-05-30 00:00:00",
+  "dedicated_covid_hosp_beds": 5309,
+  "dedicated_covid_icu": 965,
+  "icu": 965,
+  "total_hosp_beds": 5309,
   "population": [
     [
       262849,
