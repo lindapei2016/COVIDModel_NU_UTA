@@ -40,27 +40,6 @@ base_path = Path(__file__).parent
 
 ###############################################################################
 
-###################################################
-############## TOGGLES AND OPTIONS ################
-###################################################
-
-# Toggle whether or not to run Rinott
-run_Rinott = False
-
-# Toggle whether or not to run KN
-run_KN = True
-
-reps_offset = 0
-num_reps_per_peak = 8000
-
-# Switch to True and see policy generation under "if coordinate_subset:"
-# Basically when doing coordinates, the indexing gets messed up, so this
-#   was my fix...
-coordinate_subset = False
-
-
-###############################################################################
-
 # This is an identical copy of the method from Tools_Optimization.py
 #   so that this file can run standalone without importing simulation modules
 def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
