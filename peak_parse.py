@@ -30,26 +30,27 @@ need_parse = False
 # Adding additional policies
 # 2500 from KN survivors for peaks 0, 1, 2
 # 2400 from KN survivors for across-peaks
-# And then get rid of duplicate policy 7451
+
+# Sometimes have to get rid of duplicate policy 7451
 
 if merge_additional_policies:
-    folder_name = "500F"
+    folder_name = "coordinate"
 
-    prefix1 = "2500_"
-    prefix2 = "across_peak_policies_"
+    prefix1 = "coordinate_"
+    prefix2 = "coordinate_additional_"
 
     for peak in np.arange(3):
 
         stage2_days_df_1 = pd.read_csv(
             base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
-            index_col=0)[:2400]
+            index_col=0)
         stage3_days_df_1 = pd.read_csv(
             base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
-            index_col=0)[:2400]
+            index_col=0)
         ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
                                                     (prefix1 + "aggregated_peak" + str(peak) +
                                                      "_ICU_violation_patient_days.csv"),
-                                                    index_col=0)[:2400]
+                                                    index_col=0)
 
         stage2_days_df_2 = pd.read_csv(
             base_path / folder_name / (prefix2 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
@@ -61,12 +62,6 @@ if merge_additional_policies:
                                                     (prefix2 + "aggregated_peak" + str(peak) +
                                                      "_ICU_violation_patient_days.csv"),
                                                     index_col=0)
-
-        stage2_days_df_2.drop(columns="7451", inplace=True)
-        stage3_days_df_2.drop(columns="7451", inplace=True)
-        ICU_violation_patient_days_df_2.drop(columns="7451", inplace=True)
-
-        breakpoint()
 
         stage2_days_df_1.reset_index(drop=True, inplace=True)
         stage3_days_df_1.reset_index(drop=True, inplace=True)
@@ -84,9 +79,9 @@ if merge_additional_policies:
         stage3_days_df.reset_index(drop=True, inplace=True)
         ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
 
-        stage2_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_stage2_days.csv")
-        stage3_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_stage3_days.csv")
-        ICU_violation_patient_days_df.to_csv("2400_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+        stage2_days_df.to_csv("coordinate_ALL_aggregated_peak" + str(peak) + "_stage2_days.csv")
+        stage3_days_df.to_csv("coordinate_ALL_aggregated_peak" + str(peak) + "_stage3_days.csv")
+        ICU_violation_patient_days_df.to_csv("coordinate_ALL_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()
 
@@ -94,16 +89,16 @@ breakpoint()
 
 if merge_task_files:
     # Merge task-separated files
-    folder_name = "across_peak_policies_to_simulate_aggregated"
+    folder_name = "3000I"
 
     prefix = "task"
 
-    stage2_days_df_list = []
-    stage3_days_df_list = []
-    ICU_violation_patient_days_df_list = []
-
     for peak in np.arange(3):
-        for task in np.arange(25):
+        stage2_days_df_list = []
+        stage3_days_df_list = []
+        ICU_violation_patient_days_df_list = []
+
+        for task in np.arange(10):
             stage2_days_df = pd.read_csv(
                 base_path / folder_name / (prefix + str(task) + "_aggregated_peak" + str(peak) + "_stage2_days.csv"),
                 index_col=0)
@@ -132,10 +127,10 @@ if merge_successive_reps:
     # Combining first 300 replications from all policies with next 700 replications
     #   from surviving policies
 
-    folder_name = "600G"
+    folder_name = "3000I"
 
-    prefix1 = "600G_"
-    prefix2 = "fixed_2400_"
+    prefix1 = "5000reps_"
+    prefix2 = "3000I_"
 
     for peak in np.arange(3):
 
@@ -169,6 +164,14 @@ if merge_successive_reps:
         stage3_days_df = pd.concat([stage3_days_df_1[stage3_days_df_2.columns], stage3_days_df_2])
         ICU_violation_patient_days_df = pd.concat([ICU_violation_patient_days_df_1[ICU_violation_patient_days_df_2.columns], ICU_violation_patient_days_df_2])
 
+        stage2_days_df_2.dropna(axis=0, inplace=True)
+        stage3_days_df_2.dropna(axis=0, inplace=True)
+        ICU_violation_patient_days_df_2.dropna(axis=0, inplace=True)
+
+        stage2_days_df.dropna(axis=0, inplace=True)
+        stage3_days_df.dropna(axis=0, inplace=True)
+        ICU_violation_patient_days_df.dropna(axis=0, inplace=True)
+
         # print(stage2_days_df[:300].mean() - stage2_days_df[300:].mean())
         # print(stage3_days_df[:300].mean() - stage3_days_df[300:].mean())
         # print(ICU_violation_patient_days_df[:300].mean() - ICU_violation_patient_days_df[300:].mean())
@@ -177,9 +180,9 @@ if merge_successive_reps:
         stage3_days_df.reset_index(drop=True, inplace=True)
         ICU_violation_patient_days_df.reset_index(drop=True, inplace=True)
 
-        stage2_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_stage2_days.csv")
-        stage3_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_stage3_days.csv")
-        ICU_violation_patient_days_df.to_csv("3000_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
+        stage2_days_df.to_csv("8000reps_aggregated_peak" + str(peak) + "_stage2_days.csv")
+        stage3_days_df.to_csv("8000reps_aggregated_peak" + str(peak) + "_stage3_days.csv")
+        ICU_violation_patient_days_df.to_csv("8000reps_aggregated_peak" + str(peak) + "_ICU_violation_patient_days.csv")
 
 breakpoint()
 

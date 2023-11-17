@@ -1,11 +1,10 @@
 ###############################################################################
 #   _________________________________________________
 # ((                                                 ))
-#  ))     LP's WIP parsing script scratchpad ^_^    ((
+#  ))     LP's CDC Optimization Toolbox             ((
 # ((                                                 ))
 #   -------------------------------------------------
 #
-# Based off of Script_CDCOptimizationParse.py
 # Doing unconstrained optimization right now
 #
 # After running Script_CDCOptimization_FinerGrid_AdditionalReps.py,
@@ -13,10 +12,6 @@
 #   lowest_cost and other performance statistics such as average days in
 #   each stage and ICU patient days violation. Also generates figures.
 #
-# IMPORTANT NOTE: currently this is "hardcoded" to
-#   analyze 12172 CDC policies in a particular order
-#   (last policy is the currently implemented CDC policy)
-#   and also "hardcoded" for 4 peaks with 300 replications each
 # TODO: still reforming this script file so others can
 #   run it on their own set of policies and simulation data
 #   and so that a set of policies is not hardcoded
@@ -25,11 +20,6 @@
 #   this subsection -- must have .csv files for policies'
 #   performance measures of days in stage 2, days in stage 3,
 #   and ICU violation patient days across 4 peaks
-#
-# WARNING: some stuff is hardcoded unfortunately --
-#   such as the number of peaks and number of reps --
-#   make sure that these are set properly -- right now
-#   we do peaks 0,1,2 and 300 reps per peak
 #
 # Note on "all peaks" vs "across peaks" -- tried to create a distinction
 #   but hopefully this does not add additional confusion --
@@ -43,11 +33,6 @@
 #   which is computed as
 #       proportion of sample paths i such that replication i was feasible
 #       (below ICU capacity) for all 4 peaks
-#
-# As of 09/01/2023 has been commented and organized into sections
-# As of 08/29/2023 also incorporating CDC policy (policy #12172) for 4 peaks
-# Deleted analysis subroutines that we are no longer using to clean up file
-#   -- look at previous file versions for these subroutines
 
 ###############################################################################
 
@@ -57,14 +42,8 @@
 
 import pandas as pd
 import numpy as np
-import time
-import glob
 import itertools
-import matplotlib.pyplot as plt
-import matplotlib.patches as patches
 import matplotlib
-import scipy.stats
-import seaborn as sns
 
 from pathlib import Path
 
@@ -77,10 +56,7 @@ base_path = Path(__file__).parent
 ###################################################
 
 # Change this to the name of a folder with aggregated files to parse
-# aggregated_files_folder_name = "Results_09292023_NoCaseThreshold_12172Policies_BetterSubset_4000Reps"
-# aggregated_files_folder_name = "500F"
-# aggregated_files_folder_name = "coordinate"
-aggregated_files_folder_name = "600G"
+aggregated_files_folder_name = "3000I"
 
 # Change this to prefix of the aggregated files to parse
 # Files to parse are
@@ -98,13 +74,9 @@ aggregated_files_folder_name = "600G"
 #   and is recreated here as well -- make sure to preserve the
 #   mapping order so that IDs are matched appropriately to
 #   the actual policy
-aggregated_files_prefix = "3000_aggregated_peak"
-# aggregated_files_prefix = "aggregated_coordinate_peak"
-# aggregated_files_prefix = "100A_aggregated_peak"
+aggregated_files_prefix = "8000reps_aggregated_peak"
 
-# full_df_files_prefix = "2500reps_"
-# full_df_files_prefix = "coordinate_"
-full_df_files_prefix = "3000reps_"
+full_df_files_prefix = "8000reps_"
 
 # Toggle for whether or not to create reorganized dfs
 #   -- these dfs contain columns for thresholds values
@@ -121,10 +93,14 @@ create_reorganized_dfs = True
 # Set to True if have dataframe for subset of 7452 policies
 subset_of_policies = True
 
+# Toggle whether or not to run Rinott
+run_Rinott = False
+
 # Toggle whether or not to run KN
 run_KN = True
 
-num_reps_per_peak = 3000
+reps_offset = 0
+num_reps_per_peak = 8000
 
 # Switch to True and see policy generation under "if coordinate_subset:"
 # Basically when doing coordinates, the indexing gets messed up, so this
@@ -138,12 +114,10 @@ coordinate_subset = False
 matplotlib.cm.get_cmap("magma_r").set_bad("white")
 matplotlib.cm.get_cmap("cool").set_bad("white")
 
-
 ###############################################################################
 
 # This is an identical copy of the method from Tools_Optimization.py
 #   so that this file can run standalone without importing simulation modules
-
 def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     """
     Creates a list of 5-tuples, where each 5-tuple has the form
@@ -184,9 +158,115 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     return feasible_combos
 
 
+def write_non_surge_CDC_policy_ID_mapping_csv(list_of_tuples_for_policies,
+                                              filename):
+    '''
+    Important note: this is for non-surge policies only
+        (e.g. policies in which the case threshold (which triggers a "surge")
+        is inf, so we do not consider the "surge" thresholds and only
+        consider the "non-surge" thresholds)
+
+    From list of tuples (with each tuple containing non-surge
+        information characterizing a CDC-style policy),
+        create a .csv file with 6 columns:
+            "ID" (policy ID)
+            "hosp1" (hospital admits blue-to-yellow non-surge threshold)
+            "hosp2" (hospital admits yellow-to-red non-surge threshold)
+            "beds1" (staffed beds blue-to-yellow non-surge threshold)
+            "beds2" (staffed beds yellow-to-red non-surge threshold)
+
+    i.e. creates a .csv file with a mapping from an integer ID
+        to the information characterizing that policy -- therefore
+        we can refer to a policy simply as "policy X" instead of
+        needing to explicitly note all of its threshold values
+
+    Does not return anything -- simply writes .csv file to
+        working directory
+
+    :param list_of_tuples_for_policies [list of tuples] -- list of
+        3-tuples with the following structure:
+        1st element in tuple is a scalar corresponding to
+            case thresholds
+        2nd element in tuple is dictionary with keys
+            "non_surge" and "surge" -- respective values
+            are 3-tuples -- first element in tuple is always
+            -1, second element is a nonnegative integer
+            corresponding to blue-to-yellow threshold for
+            hospital admits, third element is a nonnegative integer
+            corresponding to yellow-to-red threshold for hospital
+            admits trigger
+        3rd element in tuple is analagous to 2nd element in tuple but
+            for percent staffed beds trigger
+
+        e.g. example of element (3-tuple) in list
+        (inf,
+        {'non_surge': (-1, 0, 5), 'surge': (-1, -1, 0)},
+        {'non_surge': (inf, inf, inf), 'surge': (-1, -1, inf)})
+        corresponds to a CDC-style policy with no case threshold trigger,
+            a hospital-admits blue-to-yellow threshold of 0 and
+            yellow-to-red threshold of 5, and no staffed beds trigger
+
+    :param filename [str ending in ".csv"] -- name of .csv file
+        into which we write mapping information
+    '''
+
+    non_surge_hosp_adm_first_thresholds = []
+    non_surge_staffed_first_thresholds = []
+
+    non_surge_hosp_adm_second_thresholds = []
+    non_surge_staffed_second_thresholds = []
+
+    for i in range(len(list_of_tuples_for_policies)):
+        non_surge_hosp_adm_first_thresholds.append(list_of_tuples_for_policies[i][1]["non_surge"][1])
+        non_surge_staffed_first_thresholds.append(list_of_tuples_for_policies[i][2]["non_surge"][1])
+
+        non_surge_hosp_adm_second_thresholds.append(list_of_tuples_for_policies[i][1]["non_surge"][2])
+        non_surge_staffed_second_thresholds.append(list_of_tuples_for_policies[i][2]["non_surge"][2])
+
+    mapping_df = pd.DataFrame({"ID": np.arange(len(list_of_tuples_for_policies)),
+                               "hosp1": non_surge_hosp_adm_first_thresholds,
+                               "hosp2": non_surge_hosp_adm_second_thresholds,
+                               "beds1": non_surge_staffed_first_thresholds,
+                               "beds2": non_surge_staffed_second_thresholds})
+
+    mapping_df.to_csv(filename)
+
 ###############################################################################
 
-# TODO: better to replace this with a .csv file of policies or something
+# Helper functions for computing unconstrained objective function
+#   and finding lowest_cost wrt unconstrained objective function
+
+def make_weighted_sum(df1, df2, df3, df4, weight1, weight2, weight3, weight4):
+    '''
+    Return a DataFrame that is the weighted sum of DataFrames
+        df1, df2, df3, df4 with respective weights weight1, weight2, weight3, weight4
+
+    Adds dataframes element-wise -- df1, df2, df3, df4 should all be the same size
+        and have the same columns
+
+    We use this subroutine to build the cost / objective function that sums
+        the weighted cost of days in each stage and the cost (penalized) of
+        ICU patient days over capacity -- in this context, the each column
+        df1, df2, df3, and df4 is a string of an integer corresponding to a policy ID
+    '''
+    weighted_df1 = df1 * weight1
+    weighted_df2 = df2 * weight2
+    weighted_df3 = df3 * weight3
+    weighted_df4 = df4 * weight4
+    summed_df = weighted_df1.add(weighted_df2, axis=1).add(weighted_df3, axis=1).add(weighted_df4, axis=1)
+    return summed_df
+
+
+def find_lowest_cost_weighted_sum(summed_df):
+    '''
+    Returns the lowest average value (cost) from summed_df
+        as well as the policy ID corresponding to this value
+    '''
+    min_val = summed_df.mean().iloc[summed_df.mean().argmin()]
+    min_ix = int(summed_df.mean().index[summed_df.mean().argmin()])
+    return min_val, min_ix
+
+###############################################################################
 
 # Creates list of policies (not policy objects like in the
 #   simulation, simply list of tuples containing info on thresholds
@@ -195,7 +275,9 @@ def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
 # Order of list: single-indicator policies (hospital admits only
 #   then staffed beds only), two-indicator policies, CDC policy last
 
-# Turned off case_threshold!
+# This example creates 7452 policies
+
+# Turn off case_threshold!
 case_threshold = np.inf
 
 policies = []
@@ -300,7 +382,7 @@ if coordinate_subset:
 
         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
-    for second_threshold in np.arange(1, 16):
+    for second_threshold in np.arange(1, 21):
         hosp_adm_thresholds = {"non_surge": (-1,
                                              1,
                                              second_threshold),
@@ -310,24 +392,11 @@ if coordinate_subset:
 
         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
+write_non_surge_CDC_policy_ID_mapping_csv(policies, "CDC_optimization_mapping.csv")
+
 ###############################################################################
 
-# Helper functions for computing unconstrained objective function
-#   and finding lowest_cost wrt unconstrained objective function
 
-def make_weighted_sum(df1, df2, df3, df4, weight1, weight2, weight3, weight4):
-    weighted_df1 = df1 * weight1
-    weighted_df2 = df2 * weight2
-    weighted_df3 = df3 * weight3
-    weighted_df4 = df4 * weight4
-    summed_df = weighted_df1.add(weighted_df2, axis=1).add(weighted_df3, axis=1).add(weighted_df4, axis=1)
-    return summed_df
-
-
-def find_lowest_cost_weighted_sum(summed_df):
-    min_val = summed_df.mean().iloc[summed_df.mean().argmin()]
-    min_ix = int(summed_df.mean().index[summed_df.mean().argmin()])
-    return min_val, min_ix, policies[min_ix]
 
 
 ###############################################################################
@@ -353,27 +422,29 @@ for peak in np.arange(3):
         base_path / aggregated_files_folder_name /
         (aggregated_files_prefix + str(peak) + "_stage2_days.csv"),
         index_col=0)
-    stage2_days_dict[str(peak)] = stage2_days_df[:num_reps_per_peak]
-    stage2_days_dfs_per_peak.append(stage2_days_df[:num_reps_per_peak])
+    stage2_days_dict[str(peak)] = stage2_days_df[reps_offset:reps_offset + num_reps_per_peak]
+    stage2_days_dfs_per_peak.append(stage2_days_df[reps_offset:reps_offset + num_reps_per_peak])
 
     stage3_days_df = pd.read_csv(
         base_path / aggregated_files_folder_name /
         (aggregated_files_prefix + str(peak) + "_stage3_days.csv"),
         index_col=0)
-    stage3_days_dict[str(peak)] = stage3_days_df[:num_reps_per_peak]
-    stage3_days_dfs_per_peak.append(stage3_days_df[:num_reps_per_peak])
+    stage3_days_dict[str(peak)] = stage3_days_df[reps_offset:reps_offset + num_reps_per_peak]
+    stage3_days_dfs_per_peak.append(stage3_days_df[reps_offset:reps_offset + num_reps_per_peak])
 
     ICU_violation_patient_days_df = pd.read_csv(
         base_path / aggregated_files_folder_name /
         (aggregated_files_prefix + str(peak) + "_ICU_violation_patient_days.csv"),
         index_col=0)
-    ICU_violation_patient_days_dict[str(peak)] = ICU_violation_patient_days_df[:num_reps_per_peak]
-    ICU_violation_patient_days_per_peak.append(ICU_violation_patient_days_df[:num_reps_per_peak])
+    ICU_violation_patient_days_dict[str(peak)] = ICU_violation_patient_days_df[
+                                                 reps_offset:reps_offset + num_reps_per_peak]
+    ICU_violation_patient_days_per_peak.append(
+        ICU_violation_patient_days_df[reps_offset:reps_offset + num_reps_per_peak])
 
     # Also compute number of days in stage 1 from number of days in stages 2 and 3
     stage1_days_df = peaks_end_times[peak] - peaks_start_times[peak] - stage2_days_df.add(stage3_days_df, axis=1)
-    stage1_days_dict[str(peak)] = stage1_days_df[:num_reps_per_peak]
-    stage1_days_dfs_per_peak.append(stage1_days_df[:num_reps_per_peak])
+    stage1_days_dict[str(peak)] = stage1_days_df[reps_offset:reps_offset + num_reps_per_peak]
+    stage1_days_dfs_per_peak.append(stage1_days_df[reps_offset:reps_offset + num_reps_per_peak])
 
 stage1_days_all_peaks = pd.concat(stage1_days_dfs_per_peak)
 stage2_days_all_peaks = pd.concat(stage2_days_dfs_per_peak)
@@ -381,11 +452,9 @@ stage3_days_all_peaks = pd.concat(stage3_days_dfs_per_peak)
 ICU_violation_patient_days_all_peaks = pd.concat(ICU_violation_patient_days_per_peak)
 
 # If doing 4 peaks, need to add 4th peak
-# Oh -- I hardcoded number of reps -- so need to change the index cutoffs depending on
-#   how many replications!
 feasibility_across_peaks = ((ICU_violation_patient_days_all_peaks == 0)[:num_reps_per_peak] &
-                            (ICU_violation_patient_days_all_peaks == 0)[num_reps_per_peak:2*num_reps_per_peak] &
-                            (ICU_violation_patient_days_all_peaks == 0)[2*num_reps_per_peak:3*num_reps_per_peak])
+                            (ICU_violation_patient_days_all_peaks == 0)[num_reps_per_peak:2 * num_reps_per_peak] &
+                            (ICU_violation_patient_days_all_peaks == 0)[2 * num_reps_per_peak:3 * num_reps_per_peak])
 
 feasibility_across_peaks_mean = feasibility_across_peaks.mean()
 
@@ -412,7 +481,8 @@ for w in [503]:
         cost_dfs_per_peak.append(cost_df)
 
     cost_df_all_peaks = pd.concat(cost_dfs_per_peak)
-    lowest_cost_val, lowest_cost_ix, lowest_cost_policy = find_lowest_cost_weighted_sum(cost_df_all_peaks)
+    lowest_cost_val, lowest_cost_ix = find_lowest_cost_weighted_sum(cost_df_all_peaks)
+    lowest_cost_policy = policies[lowest_cost_ix]
 
     print(w, lowest_cost_policy[1]["non_surge"], lowest_cost_policy[2]["non_surge"],
           ICU_violation_patient_days_all_peaks.mean()[str(lowest_cost_ix)],
@@ -427,9 +497,6 @@ breakpoint()
 
 # GENERATE DATAFRAME WHERE COLUMNS ARE SORTED IN ORDER OF POLICY ID
 # AND ALSO WE HAVE COLUMNS FOR HOSP1, HOSP2, BEDS1, BEDS2
-
-# Optimal single indicator hospital beds only policy is (3, 17)
-# Optimal single indicator staffed beds only policy is (0.04, 0.25)
 
 non_surge_hosp_adm_first_thresholds = []
 non_surge_staffed_first_thresholds = []
@@ -452,7 +519,6 @@ if subset_of_policies:
     non_surge_hosp_adm_second_thresholds = np.array(non_surge_hosp_adm_second_thresholds)[subset_policies_ix]
     non_surge_staffed_second_thresholds = np.array(non_surge_staffed_second_thresholds)[subset_policies_ix]
 
-
 # There's some wonky business with the column names
 # This is not a problem for the single-indicator ordering because that is from 0 to 2652
 # And also not a problem for computing the unconstrained lowest_cost because we use indexing
@@ -464,9 +530,13 @@ if subset_of_policies:
 
 # Need to adjust feasibility for across-peak stuff
 
-def create_full_df(cost_df, stage1_days_df, stage2_days_df, stage3_days_df, ICU_violation_patient_days_df,
-                   feasibility_df, filename):
-    # breakpoint()
+def create_full_df(cost_df,
+                   stage1_days_df,
+                   stage2_days_df,
+                   stage3_days_df,
+                   ICU_violation_patient_days_df,
+                   feasibility_df,
+                   filename):
     cost_df.columns = cost_df.columns.astype("int")
     cost_array_index_corrected = np.array(cost_df[cost_df.columns.sort_values()].mean())
     cost_array_index_corrected_standarderror = np.array(cost_df[cost_df.columns.sort_values()].sem())
@@ -493,8 +563,6 @@ def create_full_df(cost_df, stage1_days_df, stage2_days_df, stage3_days_df, ICU_
     feasibility_df_index_corrected = np.array(feasibility_df[feasibility_df.columns.sort_values()].mean())
     feasibility_df_index_corrected_standard_error = np.array(feasibility_df[feasibility_df.columns.sort_values()].sem())
 
-    # breakpoint()
-
     full_df = pd.DataFrame({"hosp1": non_surge_hosp_adm_first_thresholds,
                             "hosp2": non_surge_hosp_adm_second_thresholds,
                             "beds1": non_surge_staffed_first_thresholds,
@@ -515,7 +583,6 @@ def create_full_df(cost_df, stage1_days_df, stage2_days_df, stage3_days_df, ICU_
     full_df.to_csv(base_path / aggregated_files_folder_name / filename)
 
     return full_df
-
 
 # cost_dfs_per_peak is a list -- has cost_df according to the last w simulated
 #   (see above code), so be mindful of the weights that are used for the cost!
@@ -597,7 +664,49 @@ iz_param = 503
 
 # Use the same k and same variances based on initial round of KN for subsequent iterations of KN
 #   to get desired statistical guarantee
-num_feasible_policies_100_reps = [7037, 7399, 6104, 6002]
+# num_feasible_policies_100_reps = [7037, 7399, 6104, 6002]
+# round 3
+num_feasible_policies_100_reps = [20, 3, 17, 7]
+
+breakpoint()
+
+reps_needed = []
+
+# peak 3 is across-peak!
+# for peak in np.arange(4):
+for peak in np.arange(4):
+
+    # Peak-specific k, eta, hsquared
+    k = num_feasible_policies_100_reps[peak]
+
+    Z = np.random.normal(size=(int(1e5), k - 1))
+    Y = np.random.chisquare(df=(n0 - 1), size=(int(1e5), k - 1))
+    C = np.random.chisquare(df=(n0 - 1), size=int(1e5))
+    C = np.reshape(C, (len(C), 1))
+    Cmat = np.repeat(C, k - 1, axis=1)
+    denom = np.sqrt((n0 - 1) * (1 / Y + 1 / Cmat))
+    H = np.sort(np.max(Z * denom, axis=1))
+    rinott_constant = np.quantile(H, 1 - 0.05 / 2.0)
+
+    subset_policies_ix = pd.read_csv("w503_5000reps_non_eliminated_feasible_policies_peak" + str(peak) + ".csv",
+                                     header=None)
+    subset_policies_ix = np.array(subset_policies_ix, dtype="int")
+
+    for ix in subset_policies_ix:
+        # breakpoint()
+        if peak <= 2:
+            var = np.sum((cost_dfs_per_peak[peak][ix][:n0] - np.average(cost_dfs_per_peak[peak][ix][:n0])) ** 2) / (
+                        n0 - 1)
+        elif peak == 3:
+            current_ix_costs = (cost_dfs_per_peak[0][ix][:n0] +
+                                cost_dfs_per_peak[1][ix][:n0] +
+                                cost_dfs_per_peak[2][ix][:n0]) / 3
+            var = np.sum((current_ix_costs - np.average(current_ix_costs[:n0])) ** 2) / (n0 - 1)
+
+        if peak == 3:
+            reps_needed.append(rinott_constant ** 2 * var / iz_param ** 2)
+
+breakpoint()
 
 # Also, idea is to do the pairwise comparisons more intelligently for KN
 # Compare policies to best sample mean policy and then eliminate policies
@@ -632,7 +741,7 @@ if run_KN:
         eliminated_policies_ix = set([])
 
         for i in range(len(feasible_policies_df_current_peak)):
-        # for i in range(100):
+            # for i in range(100):
 
             eliminated_policies_ix = set(eliminated_policies_ix)
             eliminated_policies_ix = list(eliminated_policies_ix)
@@ -670,6 +779,8 @@ if run_KN:
 
                 var_of_diff_dict[ix] = var_of_diff
 
+                print(var_of_diff * hsquared / iz_param ** 2)
+
             # counter = 0
 
             for ix in feasible_policies_df_current_peak.index:
@@ -689,7 +800,8 @@ if run_KN:
 
         # The way I set this up is that we simulate the same set of policies per peak, so
         #   we are just grabbing the columns from the 0th (1st) peak
-        non_eliminated_policies = set(stage3_days_dict[str(0)].columns.astype(int)).difference(set(eliminated_policies_ix))
+        non_eliminated_policies = set(stage3_days_dict[str(0)].columns.astype(int)).difference(
+            set(eliminated_policies_ix))
         feasible_policies = set(feasible_policies_df_current_peak.index)
         non_eliminated_feasible_policies = list(non_eliminated_policies.intersection(feasible_policies))
 
@@ -705,8 +817,8 @@ if run_KN:
 #
 #  / \-----------------------------------------------------,
 #  \_,|                                                    |
-#     |   Selected old subroutines and notes               |
-#     |   Work in progress: organizing following code      |
+#     |                                                    |
+#     |   Code graveyard                                   |
 #     |  ,--------------------------------------------------
 #     \_/__________________________________________________/
 #               \\     =o)
@@ -718,146 +830,3 @@ if run_KN:
 ###############################################################################
 ###############################################################################
 ###############################################################################
-
-breakpoint()
-
-# Paired t-tests
-# TODO: this section is a work in progress!
-
-# For every peak, compare "best" (lowest sample mean) hospital-admits-only policy,
-#   "best" staffed-beds-only policy, "best" double-indicator policy,
-#   CDC implemented policy -- see if they are statistically distinguishable
-
-# For each peak, ix of policy with lowest cost sample mean
-lowest_cost_ix_dict = {}
-for peak in np.arange(3):
-    ls = []
-    ls.append(full_df_dict[str(peak)].sort_values("cost").index[0])
-    ls.append(full_df_dict[str(peak)][full_df_dict[str(peak)].beds1 == np.inf].sort_values("cost").index[0])
-    ls.append(full_df_dict[str(peak)][full_df_dict[str(peak)].hosp1 == np.inf].sort_values("cost").index[0])
-    ls.append(full_df_dict[str(peak)][full_df_dict[str(peak)].beds1 < np.inf][
-                  full_df_dict[str(peak)].hosp1 < np.inf].sort_values("cost").index[0])
-    lowest_cost_ix_dict[peak] = set(ls)
-
-statistically_indistinguishable_policies_ix_dict = {}
-for peak in np.arange(3):
-    statistically_indistinguishable_policies_ix_dict[peak] = {}
-    for comparison_ix in lowest_cost_ix_dict[peak]:
-        statistically_indistinguishable_policies_ix_dict[peak][comparison_ix] = []
-        for j in full_df_dict[str(peak)].index:
-            pval = scipy.stats.ttest_ind(np.array(cost_dfs_per_peak[peak][str(comparison_ix)]),
-                                         np.array(cost_dfs_per_peak[peak][str(j)]),
-                                         equal_var=False, alternative="greater")[1]
-            if pval > 0.975:
-                statistically_indistinguishable_policies_ix_dict[peak][comparison_ix].append(j)
-
-breakpoint()
-
-# Across-peak ix of policy with lowest cost sample mean is lowest_cost_ix
-
-# We need to use cost_df_all_peaks because we want all replications, not just the mean
-sum_cost_df_all_peaks = cost_df_all_peaks[:2000] + \
-                        cost_df_all_peaks[2000:4000] + \
-                        cost_df_all_peaks[4000:]
-
-# For each peak (and across-peaks), 4 policies including current CDC policy
-#   --> 6 pairwise comparisons / paired t-tests
-
-# Test the hypothesis that the identified lowest_cost_ix policy is less than the CDC policy
-# We use cost_df_all_peaks because
-# Alternative argument defines alternative hypothesis!
-# t-statistic is negative which makes sense -- a < b
-
-breakpoint()
-
-scipy.stats.ttest_ind(np.array(sum_cost_df_all_peaks[str(lowest_cost_ix)]), np.array(sum_cost_df_all_peaks[str(12172)]),
-                      equal_var=False, alternative="greater")
-
-better_policies = []
-
-# Compare CDC policies to other policies -- paired t test
-# Null hypothesis: CDC policy is better than policy (1st sample mean > 2nd sample mean)
-# Alternative hypothesis: CDC policy is worse than policy (1st sample mean < 2nd sample mean)
-# Low p value means we reject null hypothesis
-
-# Need to sort through this
-# for j in np.arange(12172):
-#     pval = \
-#         scipy.stats.ttest_ind(np.array(cost_df_all_peaks[j]), np.array(cost_df_all_peaks[12172]), equal_var=False,
-#                               alternative="less")[1]
-#     if pval < 0.05:
-#         better_policies.append(j)
-#
-# better_hosp_only_policies_df = full_df.iloc[better_policies][full_df.iloc[better_policies]["beds1"] == np.inf]
-# better_beds_only_policies_df = full_df.iloc[better_policies][full_df.iloc[better_policies]["hosp1"] == np.inf]
-# better_double_indicator_policies_df = full_df.iloc[
-#     np.setdiff1d(np.setdiff1d(better_policies, np.asarray(better_hosp_only_policies_df.index)),
-#                  np.asarray(better_beds_only_policies_df.index))]
-# better_beds_only_policies_df.sort_values("cost")
-# better_hosp_only_policies_df.sort_values("cost")
-# better_double_indicator_policies_df.sort_values("cost")
-
-breakpoint()
-
-# plt.scatter(np.arange(0,100), full_df.iloc[better_policies].sort_values("cost")["stage2"][:100], marker="^", c="gold", label="Days in Yellow")
-# plt.scatter(np.arange(0,100), full_df.iloc[better_policies].sort_values("cost")["stage3"][:100], marker="+", c="red", label="Days in Red")
-# plt.xlabel("Top 100 policies ordered from best to worst")
-# plt.ylabel("Number of days in stage (average)")
-# plt.legend()
-# plt.title("Distribution of number of days in stage for top 100 policies")
-# plt.savefig("scatterplot.png", dpi=1200)
-
-###############################################################################
-
-# # Coordinate descent stuff continued
-#
-# # Note sometimes e.g. for staffed beds with decimals -- the values do not match exactly
-# #   so do np.abs(blahblah) < small number to match values (when looking up staffed beds thresholds)
-#
-# hosp_3_17_df = full_df[(full_df["hosp1"] == 3) & (full_df["hosp2"] == 17) & (full_df["beds1"] < np.inf)].copy(deep=True)
-# hosp_3_17_df.sort_values(["beds1", "beds2"], inplace=True)
-#
-# # 4 x 7
-#
-# # Need to reshape into upper triangular array!
-# base_array = np.full(28, 0)
-#
-# for i in np.arange(28):
-#     base_array[i] = hosp_3_17_df["cost"].iloc[i]
-#
-# # This works!
-# plt.clf()
-# s = sns.heatmap(np.reshape(base_array, (4, 7)), xticklabels=hosp_3_17_df["beds2"].unique(), yticklabels=hosp_3_17_df["beds1"].unique(), cmap="magma_r")
-# plt.title("Avg cost of days plus cost of ICU patient days violation")
-# plt.show()
-#
-# breakpoint()
-#
-# beds_00_55_df = full_df[(np.abs(full_df["beds1"] - .00) < 1e-2) & (np.abs(full_df["beds2"] - .55) < 1e-2) & (full_df["hosp1"] < np.inf)].copy(deep=True)
-# beds_00_55_df.sort_values(["hosp1", "hosp2"], inplace=True)
-#
-# # 10*34
-#
-# # Need to reshape into upper triangular array!
-# base_array = np.full(10*34, 0)
-#
-# for i in np.arange(10*34):
-#     base_array[i] = beds_00_55_df["cost"].iloc[i]
-#
-# # This works!
-# plt.clf()
-# sns.heatmap(np.reshape(base_array, (10, 34)), xticklabels=beds_00_55_df["hosp2"].unique(), yticklabels=beds_00_55_df["hosp1"].unique(), cmap="magma_r")
-# plt.show()
-#
-# breakpoint()
-
-###############################################################################
-
-# No longer used -- scatterplots, but those suffer from overplotting
-# No longer used -- density plots, but those create the illusion of continuous spaces
-#
-# plt.clf()
-# sns.kdeplot(data=full_df.sort_values("cost")[:100], x="hosp2", y="beds2", cmap="mako_r", shade=True)
-# plt.show()
-#
-# breakpoint()

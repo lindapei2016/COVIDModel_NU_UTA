@@ -85,11 +85,11 @@ sample_paths_generated_per_processor = 100
 need_evaluation = True
 
 # If only interested in evaluating on subset of reps
-num_reps_evaluated_per_policy = 250
+num_reps_evaluated_per_policy = 300
 
 # Reps offset
 # Rep number to start on
-reps_offset = 3000 + num_reps_evaluated_per_policy * task_number
+reps_offset = 5000 + num_reps_evaluated_per_policy * task_number
 
 # Set to True if have .csv files that specify
 #   which policies to simulate
