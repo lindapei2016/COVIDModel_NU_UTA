@@ -27,6 +27,36 @@ need_parse = False
 
 ###############################################################################
 
+def combine_two_aggregate_files_by_row(base_path,
+                                       folder_name,
+                                       aggregated_filename_1,
+                                       aggregated_filename_2):
+    '''
+    For adding data from additional reps for the same set of policies
+        to an aggregated dataset for a particular performance measure
+    '''
+
+    for peak in np.arange(3):
+
+        stage2_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
+            index_col=0)
+        stage3_days_df_1 = pd.read_csv(
+            base_path / folder_name / (prefix1 + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
+            index_col=0)
+        ICU_violation_patient_days_df_1 = pd.read_csv(base_path / folder_name /
+                                                    (prefix1 + "aggregated_peak" + str(peak) +
+                                                     "_ICU_violation_patient_days.csv"),
+                                                    index_col=0)
+
+def combine_two_aggregate_files_by_cols():
+    '''
+    For adding additional policies to an aggregated dataset for a
+        particular performance measure
+    '''
+
+
+
 # Adding additional policies
 # 2500 from KN survivors for peaks 0, 1, 2
 # 2400 from KN survivors for across-peaks

@@ -1,15 +1,15 @@
 ###############################################################################
 
-# Tools_Optimization.py
-# This module contains Opt(imization) Tools, and includes functions
-#   for generating realistic sample paths, enumerating candidate policies,
-#   and optimization.
+# Tools_Optimization_Utilities.py
+# This module includes functions for generating realistic sample paths
+#   and enumerating candidate policies, subroutines for simulating
+#   policies in a large-scale simulation batch, and utility functions
+#   for combining data from large-scale simulation batches.
 # This module is not used to run the SEIR model. This module contains
 #   functions "on top" of the SEIR model.
 
-# Each function in this module can run on a single processor,
-#   and can be parallelized by passing a unique processor_rank to
-#   each function call.
+# Some functions can be parallelized by passing a unique processor_rank to
+#   each function call, using MPI.
 
 # In this code, "threshold" refers to a 5-tuple of the thresholds for a policy
 #   and "policy" is an instance of MultiTierPolicy -- there's a distinction

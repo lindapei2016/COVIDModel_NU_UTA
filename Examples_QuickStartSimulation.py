@@ -44,7 +44,7 @@ from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
 from Engine_DataObjects import City, TierInfo, Vaccine
 from Engine_SimModel import SimReplication
 import Tools_InputOutput
-import Tools_Optimization
+import Tools_Optimization_Utilities
 
 # Import other Python packages
 import numpy as np

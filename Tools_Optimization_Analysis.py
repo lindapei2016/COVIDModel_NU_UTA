@@ -40,7 +40,7 @@ base_path = Path(__file__).parent
 
 ###############################################################################
 
-# This is an identical copy of the method from Tools_Optimization.py
+# This is an identical copy of the method from Tools_Optimization_Utilities.py
 #   so that this file can run standalone without importing simulation modules
 def thresholds_generator(stage2_info, stage3_info, stage4_info, stage5_info):
     """

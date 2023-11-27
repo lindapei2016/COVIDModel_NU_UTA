@@ -11,7 +11,7 @@
 
 from Engine_SimObjects import MultiTierPolicy, CDCTierPolicy
 from Engine_DataObjects import City, TierInfo, Vaccine
-from Tools_Optimization import evaluate_single_policy_on_sample_path, get_sample_paths
+from Tools_Optimization_Utilities import evaluate_single_policy_on_sample_path, get_sample_paths
 from Tools_Plot import plot_from_file, report_from_file, bar_plot_from_file
 
 import datetime as dt
