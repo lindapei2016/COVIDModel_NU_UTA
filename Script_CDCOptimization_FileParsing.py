@@ -1,7 +1,7 @@
 ###############################################################################
 #   _________________________________________________
 # ((                                                 ))
-#  ))     Script_CDCOptimizationFileParsing.py       ((
+#  ))     Script_CDCOptimization_FileParsing.py       ((
 # ((                                                 ))
 #   -------------------------------------------------
 #
@@ -128,7 +128,8 @@ create_mapping = True
 peaks_start_times = [93, 276, 502, 641]
 peaks_end_times = [215, 397, 625, 762]
 
-# Creates list of policies (not policy objects like in the
+# If create_mapping False (and policies and mapping do not exist),
+#   create list of policies (not policy objects like in the
 #   simulation, simply list of tuples containing info on thresholds
 # Each item in list is 3-tuple with case thresholds,
 #   hospital admissions thresholds, staffed beds thresholds
@@ -137,63 +138,46 @@ peaks_end_times = [215, 397, 625, 762]
 
 # This example creates 7452 policies
 
-# Turn off case_threshold!
-case_threshold = np.inf
+# Creating mapping csv file
+if create_mapping:
 
-policies = []
+    # Turn off case_threshold!
+    case_threshold = np.inf
 
-non_surge_hosp_adm_thresholds_array = thresholds_generator((-1, 0, 1),
-                                                           (-1, 0, 1),
-                                                           (0, 11, 1),
-                                                           (5, 21, 1))
+    policies = []
 
-non_surge_staffed_thresholds_array = thresholds_generator((-1, 0, 1),
-                                                          (-1, 0, 1),
-                                                          (0, .05, .01),
-                                                          (0, .11, .01))
+    non_surge_hosp_adm_thresholds_array = thresholds_generator((-1, 0, 1),
+                                                               (-1, 0, 1),
+                                                               (0, 11, 1),
+                                                               (5, 21, 1))
 
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
-    staffed_thresholds = {"non_surge": (np.inf,
-                                        np.inf,
-                                        np.inf),
-                          "surge": (-1,
-                                    -1,
-                                    np.inf)}
-    policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+    non_surge_staffed_thresholds_array = thresholds_generator((-1, 0, 1),
+                                                              (-1, 0, 1),
+                                                              (0, .05, .01),
+                                                              (0, .11, .01))
 
-for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
-    hosp_adm_thresholds = {"non_surge": (np.inf,
-                                         np.inf,
-                                         np.inf),
-                           "surge": (-1,
-                                     -1,
-                                     np.inf)}
-    staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
-                                        non_surge_staffed_thresholds[3],
-                                        non_surge_staffed_thresholds[4]),
-                          "surge": (-1,
-                                    -1,
-                                    non_surge_staffed_thresholds[3])}
-    policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
-
-# 2-indicator policies
-
-for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
-
-    hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
-                                         non_surge_hosp_adm_thresholds[3],
-                                         non_surge_hosp_adm_thresholds[4]),
-                           "surge": (-1,
-                                     -1,
-                                     non_surge_hosp_adm_thresholds[3])}
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
+        staffed_thresholds = {"non_surge": (np.inf,
+                                            np.inf,
+                                            np.inf),
+                              "surge": (-1,
+                                        -1,
+                                        np.inf)}
+        policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
     for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+        hosp_adm_thresholds = {"non_surge": (np.inf,
+                                             np.inf,
+                                             np.inf),
+                               "surge": (-1,
+                                         -1,
+                                         np.inf)}
         staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
                                             non_surge_staffed_thresholds[3],
                                             non_surge_staffed_thresholds[4]),
@@ -202,62 +186,81 @@ for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
                                         non_surge_staffed_thresholds[3])}
         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
-# Adding CDC policy!
+    # 2-indicator policies
 
-hosp_adm_thresholds = {"non_surge": (-1,
-                                     10,
-                                     20),
-                       "surge": (-1,
-                                 -1,
-                                 10)}
+    for non_surge_hosp_adm_thresholds in non_surge_hosp_adm_thresholds_array:
 
-staffed_thresholds = {"non_surge": (-1,
-                                    0.1,
-                                    0.15),
-                      "surge": (-1,
-                                -1,
-                                0.15)}
+        hosp_adm_thresholds = {"non_surge": (non_surge_hosp_adm_thresholds[2],
+                                             non_surge_hosp_adm_thresholds[3],
+                                             non_surge_hosp_adm_thresholds[4]),
+                               "surge": (-1,
+                                         -1,
+                                         non_surge_hosp_adm_thresholds[3])}
 
-policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+        for non_surge_staffed_thresholds in non_surge_staffed_thresholds_array:
+            staffed_thresholds = {"non_surge": (non_surge_staffed_thresholds[2],
+                                                non_surge_staffed_thresholds[3],
+                                                non_surge_staffed_thresholds[4]),
+                                  "surge": (-1,
+                                            -1,
+                                            non_surge_staffed_thresholds[3])}
+            policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
 
-# if coordinate_subset:
-#     policies = []
-#
-#     case_threshold = np.inf
-#
-#     staffed_thresholds = {"non_surge": (-1,
-#                                         np.inf,
-#                                         np.inf),
-#                           "surge": (-1,
-#                                     -1,
-#                                     np.inf)}
-#
-#     for first_threshold in np.arange(15):
-#         hosp_adm_thresholds = {"non_surge": (-1,
-#                                              first_threshold,
-#                                              14),
-#                                "surge": (-1,
-#                                          -1,
-#                                          first_threshold)}
-#
-#         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
-#
-#     for second_threshold in np.arange(1, 21):
-#         hosp_adm_thresholds = {"non_surge": (-1,
-#                                              1,
-#                                              second_threshold),
-#                                "surge": (-1,
-#                                          -1,
-#                                          1)}
-#
-#         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+    # Adding CDC policy!
+
+    hosp_adm_thresholds = {"non_surge": (-1,
+                                         10,
+                                         20),
+                           "surge": (-1,
+                                     -1,
+                                     10)}
+
+    staffed_thresholds = {"non_surge": (-1,
+                                        0.1,
+                                        0.15),
+                          "surge": (-1,
+                                    -1,
+                                    0.15)}
+
+    policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+
+    # if coordinate_subset:
+    #     policies = []
+    #
+    #     case_threshold = np.inf
+    #
+    #     staffed_thresholds = {"non_surge": (-1,
+    #                                         np.inf,
+    #                                         np.inf),
+    #                           "surge": (-1,
+    #                                     -1,
+    #                                     np.inf)}
+    #
+    #     for first_threshold in np.arange(15):
+    #         hosp_adm_thresholds = {"non_surge": (-1,
+    #                                              first_threshold,
+    #                                              14),
+    #                                "surge": (-1,
+    #                                          -1,
+    #                                          first_threshold)}
+    #
+    #         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+    #
+    #     for second_threshold in np.arange(1, 21):
+    #         hosp_adm_thresholds = {"non_surge": (-1,
+    #                                              1,
+    #                                              second_threshold),
+    #                                "surge": (-1,
+    #                                          -1,
+    #                                          1)}
+    #
+    #         policies.append((case_threshold, hosp_adm_thresholds, staffed_thresholds))
+
+    write_non_surge_CDC_policy_ID_mapping_csv(policies, "CDC_optimization_mapping.csv")
+
+mapping = pd.read_csv("CDC_optimization_mapping.csv", header=0)
 
 ###############################################################################
-
-# Creating mapping csv file
-if create_mapping:
-    write_non_surge_CDC_policy_ID_mapping_csv(policies, "CDC_optimization_mapping.csv")
-mapping = pd.read_csv("CDC_optimization_mapping.csv", header=0)
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Create dictionaries for each performance measure
@@ -288,7 +291,7 @@ for peak in np.arange(3):
     stage1_days_df = peaks_end_times[peak] - \
                      peaks_start_times[peak] - \
                      stage2_days_dict[peak].add(stage3_days_dict[peak], axis=1)
-    stage1_days_dict[peak] = stage1_days_df[reps_offset:reps_offset + num_reps_per_peak]
+    stage1_days_dict[peak] = stage1_days_df
 
 # ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ #
 # Also compute the feasibility across peaks

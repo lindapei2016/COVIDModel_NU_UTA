@@ -42,15 +42,15 @@ full_df_files_prefix = "8000reps_"
 # full_df_files_prefix = "coordinate_"
 
 optimal_policy_files_folder_name = "optimal"
-need_table_optimal_policy = False
+need_table_optimal_policy = True
 need_stage3_days_plot_optimal_policy = False
 need_tiers_plot_optimal_policy = False
 
 correlation_files_folder_name = "CDC"
 need_plot_correlation = False
 
-need_table_best_policies = True
-need_table_cross_validation_peaks = True
+need_table_best_policies = False
+need_table_cross_validation_peaks = False
 need_plot_regret = False
 
 need_plot_changing_coordinate = False
