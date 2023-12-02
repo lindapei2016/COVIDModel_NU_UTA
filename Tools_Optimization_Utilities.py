@@ -405,3 +405,64 @@ def evaluate_single_policy_on_sample_path(city: object,
         # Clear the policy and simulation replication history
         base_rep.policy.reset()
         base_rep.reset()
+
+
+def combine_aggregate_files_by_col(base_path,
+                                   folder_name,
+                                   list_of_aggregated_filenames):
+    '''
+    Reads in dataframes from list_of_aggregated_filenames
+        and combines them by stacking them by column --
+        e.g. used when additional policies are simulated
+        (additional as in, not in the original set of policies)
+    Returns combined dataframe
+    '''
+
+    list_of_aggregated_dataframes = []
+
+    for filename in list_of_aggregated_filenames:
+        df = pd.read_csv(base_path / folder_name / filename, index_col=0)
+        list_of_aggregated_dataframes.append(df)
+
+    combined_df = pd.concat(list_of_aggregated_dataframes, axis=1)
+    combined_df.reset_index(drop=True, inplace=True)
+
+    return combined_df
+
+
+def combine_aggregate_files_by_row(base_path,
+                                   folder_name,
+                                   list_of_aggregated_filenames):
+    '''
+    Reads in dataframes from list_of_aggregated_filenames
+        and combines them by stacking them by row --
+        e.g. used when we obtain subsequent replications
+        on policies
+    Returns combined dataframe
+    If not all dataframes have same columns/policies,
+        combined dataframe only has columns/policies present in all dataframes
+        (intersection of columns/policies amongst all dataframes)
+    e.g. if list_of_aggregated_filenames corresponds to
+        2 dataframes, and dataframe 1 has policies [1,2,3]
+        and dataframe 2 has policies [1,2], combined dataframe
+        has data from policies [1,2]
+    e.g. occurs when using an algorithm to successively eliminate
+        policies and obtain successive replications on smaller
+        subsets of the original policies
+    '''
+
+    list_of_aggregated_dataframes = []
+
+    for filename in list_of_aggregated_filenames:
+        df = pd.read_csv(base_path / folder_name / filename, index_col=0)
+        list_of_aggregated_dataframes.append(df)
+
+    combined_df = pd.concat(list_of_aggregated_dataframes, axis=0)
+    combined_df.reset_index(drop=True, inplace=True)
+
+    # Drop columns where there are NAs --
+    #   this ensures combined_df only includes columns/policies
+    #   present in all dataframes
+    combined_df.dropna(axis=1, inplace=True)
+
+    return combined_df

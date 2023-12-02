@@ -43,15 +43,14 @@ full_df_files_prefix = "8000reps_"
 
 optimal_policy_files_folder_name = "optimal"
 need_table_optimal_policy = True
-need_stage3_days_plot_optimal_policy = False
+need_plot_correlation_optimal_policy = False
 need_tiers_plot_optimal_policy = False
 
 correlation_files_folder_name = "CDC"
-need_plot_correlation = False
+need_plot_correlation_CDC = False
 
 need_table_best_policies = False
 need_table_cross_validation_peaks = False
-need_plot_regret = False
 
 need_plot_changing_coordinate = False
 need_plot_pareto = False
@@ -190,7 +189,7 @@ if need_table_optimal_policy:
 
 # breakpoint()
 
-if need_stage3_days_plot_optimal_policy:
+if need_plot_correlation_optimal_policy:
     for peak in np.arange(3):
 
         ICU_history_filenames = glob.glob("**/*rank*_peak" + str(peak) + "*optimalpolicyacrosspeaks*ICU_history*")
@@ -316,7 +315,7 @@ ICU_history_dict = {}
 IH_history_dict = {}
 ToIHT_history_dict = {}
 
-if need_plot_correlation:
+if need_plot_correlation_CDC:
     for peak in np.arange(3):
 
         # breakpoint()
@@ -620,38 +619,6 @@ if need_table_cross_validation_peaks:
         else:
             add_policy_pretty_table(policy, table, "", "Peak " + str(peak_cv + 1))
     print(table)
-
-# Note I'm hardcoding this -- across-peak best policy has ID 25 (in original policies generated)
-if need_plot_regret:
-
-    colors = ["palevioletred", "darkviolet", "cornflowerblue"]
-
-    for peak in np.arange(3):
-        stage2_days = pd.read_csv(base_path /
-                                  aggregated_files_folder_name /
-                                  (aggregated_files_prefix + "aggregated_peak" + str(peak) + "_stage2_days.csv"),
-                                  index_col=0)["25"]
-        stage3_days = pd.read_csv(base_path /
-                                  aggregated_files_folder_name /
-                                  (aggregated_files_prefix + "aggregated_peak" + str(peak) + "_stage3_days.csv"),
-                                  index_col=0)["25"]
-        ICU_violation_patient_days = pd.read_csv(base_path /
-                                                 aggregated_files_folder_name /
-                                                 (aggregated_files_prefix + "aggregated_peak" + str(
-                                                     peak) + "_ICU_violation_patient_days.csv"),
-                                                 index_col=0)["25"]
-
-        # sns.displot(stage2_days, kind="kde", bw_adjust=0.5, color="gold", label="Yellow Stage Days")
-        # sns.displot(stage3_days, kind="kde", bw_adjust=0.5)
-        # density_plot.axes[0][0].axvline(stage2_days.mean(), c="k", ls="--")
-
-        fig = sns.kdeplot(stage3_days, fill=True, alpha=0.2, color=colors[peak], label="Peak " + str(peak+1), bw_adjust=0.6)
-
-    plt.legend()
-    plt.xlabel("Days in Red Stage")
-    plt.title("Distribution of Days in Red Stage of Across-Peak Optimal Policy")
-    plt.savefig("density_across_peak_optimal.png", dpi=1200)
-    plt.clf()
 
 ################################################
 ############## COORDINATE PLOTS ################
